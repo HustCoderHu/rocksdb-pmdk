@@ -3,7 +3,7 @@
 
 #include <rocksdb/iterator.h>
 
-#include <persistent_range_mem.h>
+#include <fixed_range_mem.h>
 
 namespace rocksdb {
 
@@ -18,12 +18,12 @@ public:
     Iterator* NewIterator();
 
     // 获取range_mem_id对应的RangeMemtable结构
-    PersistentRangeMem* GetRangeMemtable(uint64_t range_mem_id);
+    FixedRange* GetRangeMemtable(uint64_t range_mem_id);
 
     // 根据key查找value
     Status Get(const Slice& key, std::string *value);
 private:
-    persistent_queue<PersistentRangeMem> range_mem_list_;
+    persistent_queue<FixedRange> range_mem_list_;
     persistent_queue<uint64_t> compact_queue_;
 
 

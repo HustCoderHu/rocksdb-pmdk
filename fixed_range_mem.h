@@ -16,18 +16,23 @@ namespace rocksdb {
 
 using std::list;
 
-class PersistentRangeMemStat {
+struct FixedRangeChunkBasedCacheStats {
+    uint64_t  used_bits_;
+    std::unordered_map<std::string, uint64_t> range_list_;
+    std::vector<std::string*> chunk_bloom_data_;
+
     // 预设的range
-    Slice start,end;
+    Slice start, end;
     // 实际的range
     Slice real_start, real_end;
     size_t chunk_num;
 };
 
-class PersistentRangeMem
+class FixedRange
 {
 public:
-    PersistentRangeMem();
+    FixedRange();
+    ~FixedRange();
 
 public:
     // 返回当前RangeMemtable中所哟chunk的有序序列
@@ -43,7 +48,8 @@ public:
 //    char* GetBloomFilter();
 
     // 将新的chunk数据添加到RangeMemtable
-    void Append(const char *bloom_data, const Slice& chunk_data);
+    void Append(const char *bloom_data, const Slice& chunk_data,
+                const Slice& new_start, const Slice& new_end);
 
     // 更新当前RangeMemtable的Global Bloom Filter
 //    void SetBloomFilter(char* bloom_data);
@@ -67,10 +73,10 @@ public:
     void CleanUp();
 
 private:
-    PersistentRangeMem(const PersistentRangeMem&) = delete;
-    PersistentRangeMem& operator=(const PersistentRangeMem&) = delete;
+    FixedRange(const FixedRange&) = delete;
+    FixedRange& operator=(const FixedRange&) = delete;
 
-    PersistentRangeMemStat stat;
+    FixedRangeChunkBasedCacheStats stat;
 
     unsigned int memid;
     std::string file_path;
@@ -78,7 +84,7 @@ private:
     size_t chunk_sum_size;
     const size_t MAX_CHUNK_SUM_SIZE;
 
-    list<PersistentChunk> psttChunkList;
+    list<size_t> psttChunkList;
 
     PMEMobjpool *pop;
 //    char *g_bloom_data;
