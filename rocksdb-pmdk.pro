@@ -6,7 +6,7 @@ CONFIG -= qt
 SOURCES += main.cpp \
     persistent_range_mem_set.cpp \
     persistent_chunk.cpp \
-    fixed_range_mem.cpp
+    fixed_range_tab.cpp
 
 HEADERS += \
     pmdk-include/libpmemobj/action.h \
@@ -87,8 +87,8 @@ HEADERS += \
     persistent_chunk.h \
     ex_common.h \
     fixed_range_chunk_based_nvm_write_cache.h \
-    fixed_range_mem.h \
-    fixed_range_iterator.h
+    fixed_range_iterator.h \
+    fixed_range_tab.h
 
 INCLUDEPATH += pmdk-include
 INCLUDEPATH += E:\github_repo\rocksdb\include

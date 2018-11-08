@@ -18,21 +18,38 @@ using std::list;
 
 struct FixedRangeChunkBasedCacheStats {
     uint64_t  used_bits_;
-    std::unordered_map<std::string, uint64_t> range_list_;
-    std::vector<std::string*> chunk_bloom_data_;
+//    std::unordered_map<std::string, uint64_t> range_list_;
+//    std::vector<std::string*> chunk_bloom_data_;
 
     // 预设的range
     Slice start, end;
+};
+
+class freqUpdateInfo {
+public:
+    explicit freqUpdateInfo(const Slice& real_start, const Slice& real_end)
+        :real_start_(real_start), real_end_(real_end) {
+
+    }
+    void update(const Slice& real_start, const Slice& real_end) {
+        if (real_start.compare(real_start_) < 0)
+            real_start_ = real_start;
+        if (real_end.compare(real_end_) > 0)
+            real_end_ = real_end;
+    }
+
     // 实际的range
-    Slice real_start, real_end;
+    // TODO 初始值怎么定
+    Slice real_start_;
+    Slice real_end_;
     size_t chunk_num;
 };
 
-class FixedRange
+class FixedRangeTab
 {
 public:
-    FixedRange();
-    ~FixedRange();
+    FixedRangeTab();
+    ~FixedRangeTab();
 
 public:
     // 返回当前RangeMemtable中所哟chunk的有序序列
@@ -56,8 +73,8 @@ public:
 
     // 返回当前RangeMem的真实key range（stat里面记录）
     void GetRealRange(Slice& real_start, Slice& real_end) {
-        real_start = stat.real_start;
-        real_end = stat.real_end;
+        real_start = info.real_start_;
+        real_end = info.real_end_;
     }
 
     // 更新当前RangeMemtable的状态
@@ -73,10 +90,11 @@ public:
     void CleanUp();
 
 private:
-    FixedRange(const FixedRange&) = delete;
-    FixedRange& operator=(const FixedRange&) = delete;
+    FixedRangeTab(const FixedRangeTab&) = delete;
+    FixedRangeTab& operator=(const FixedRangeTab&) = delete;
 
     FixedRangeChunkBasedCacheStats stat;
+    freqUpdateInfo info;
 
     unsigned int memid;
     std::string file_path;
@@ -86,7 +104,7 @@ private:
 
     list<size_t> psttChunkList;
 
-    PMEMobjpool *pop;
+
 //    char *g_bloom_data;
 };
 

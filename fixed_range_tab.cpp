@@ -1,6 +1,4 @@
-#include "fixed_range_mem.h"
-
-#include <ex_common.h>
+#include "fixed_range_tab.h"
 
 #include <table/merging_iterator.h>
 
@@ -18,7 +16,7 @@ POBJ_LAYOUT_TOID(range_mem, struct bar_el);
 POBJ_LAYOUT_END(range_mem);
 
 struct my_root {
-    size_t length;
+    size_t length; // mark end of chunk block sequence
     unsigned char data[MAX_BUF_LEN];
 };
 
@@ -28,34 +26,20 @@ struct chunk_blk {
     unsigned char data[];
 };
 
-FixedRange::FixedRange()
+FixedRangeTab::FixedRangeTab()
     : chunk_sum_size(0),
       MAX_CHUNK_SUM_SIZE(64 * 1024 * 1024),
       pop(nullptr)
 {
-    //    file_path.data()
-    if (file_exists(path) != 0) {
-        if ((pop = pmemobj_create(path, POBJ_LAYOUT_NAME(range_mem),
-                                  PMEMOBJ_MIN_POOL, 0666)) == NULL) {
-            perror("failed to create pool\n");
-            return 1;
-        }
-    } else {
-        if ((pop = pmemobj_open(path,
-                                POBJ_LAYOUT_NAME(range_mem))) == NULL) {
-            perror("failed to open pool\n");
-            return 1;
-        }
-    }
+
 }
 
-FixedRange::~FixedRange()
+FixedRangeTab::~FixedRangeTab()
 {
-    if (pop)
-        pmemobj_close(pop);
+
 }
 
-InternalIterator* FixedRange::NewInternalIterator(
+InternalIterator* FixedRangeTab::NewInternalIterator(
         ColumnFamilyData *cfd, Arena *arena)
 {
     InternalIterator* internal_iter;
@@ -80,7 +64,7 @@ InternalIterator* FixedRange::NewInternalIterator(
     internal_iter = merge_iter_builder.Finish();
 }
 
-void FixedRange::Append(const char *bloom_data,
+void FixedRangeTab::Append(const char *bloom_data,
                                          const Slice &chunk_data,
                                          const Slice &new_start,
                                          const Slice &new_end)
@@ -113,6 +97,11 @@ void FixedRange::Append(const char *bloom_data,
         chunk_sum_size += chunk_data.size_;
         // chunk 坐标，即 chunk_blk.data
         psttChunkList.push_back(dest);
+
+
+//        dest += chunk_data.size_;
+//        info.update(new_start, new_end);
+//        memcpy(dest, info, sizeof)
 //    } TX_ONCOMMIT {
 //        /* TX_STAGE_ONCOMMIT */
 //    } TX_ONABORT {

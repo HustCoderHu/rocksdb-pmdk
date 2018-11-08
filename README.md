@@ -6,15 +6,15 @@
 限制大小，间接限制 chunk 数量
 等效 L0 层
 
-chunk 文件
+fix range 文件
 ```
+| used_bits ... | 预设 start | 预设 end |
 | chunk blmFilter | chunk ...   |  不定长
 | chunk blmFilter | chunk ...  |  不定长
 | chunk blmFilter | chunk ...    |  不定长
-...
-...
-stat
+| real_start | real_end |
 ```
+布局思路，修改少的放在文件首部，频繁修改的放末尾，通过追加的方式修改，可能会有一点点的写放大
 
 索引文件
 ```
