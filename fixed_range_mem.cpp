@@ -66,6 +66,8 @@ InternalIterator* FixedRange::NewInternalIterator(
 
     rootp = POBJ_ROOT(pop, my_root);
 
+    char *dat = D_RO(rootp)->data;
+
     for (size_t chunkOffset : psttChunkList) {
 
     }

@@ -9,16 +9,26 @@ namespace rocksdb {
 
 // 参考 testutil.h
 
-class FixRangeIterator:public InternalIterator
+class FixRangeIterator : public InternalIterator
 {
-    public:
-    explicit FixRangeIterator(size_t bloomFilterLen) {
+public:
+  explicit FixRangeIterator(size_t bloomFilterLen) {
 
-    }
+  }
 
-    virtual bool Valid() const override { return current_ < keys_.size(); }
+  void Next() override {++current_;}
+  void Prev() override {--current_;}
+  virtual bool Valid() const override { return current_ < keys_.size(); }
+
+  Slice Key() override {
+
+  }
+  Slice Value() override {
+
+  }
 
 
+  size_t current_;
 };
 
 } // namespace rocksdb
