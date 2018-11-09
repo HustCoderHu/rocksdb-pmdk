@@ -16,26 +16,44 @@ class ChunkIterator : public InternalIterator {
     // keysize | key | valsize | val | ... | 1st pair offset
     // | 2nd pair offset | ... | num of pairs
     size_t nPairs;
-    char* end = data + size - sizeof(nPairs);
-    nPairs = *(const_cast<size_t*>(end));
-    pair_offset.reserve(nPairs);
+    char* nPairsOffset = data + size - sizeof(nPairs);
+    nPairs = *(static_cast<size_t*>(nPairsOffset));
+    vKey_.reserve(nPairs);
+    vValue_.reserve(nPairs);
 
-    char* start = end - sizeof(size_t) * nPairs;
+    char* metaOffset = nPairsOffset - sizeof(metaOffset) * nPairs;
 
     for (int i = 0; i < nPairs; ++i) {
-      pair_offset.push_back(start);
-      start += sizeof(size_t);
+      size_t pairOffset = *(static_cast<size_t*>(metaOffset));
+      char *pairAddr = data + pairOffset;
+
+      // key
+      size_t _size = *(static_cast<size_t*>(pairAddr));
+      vKey_.emplace_back(pairAddr + sizeof(_size), _size);
+
+      pairAddr += sizeof(_size) + _size;
+      // value
+      _size = *(static_cast<size_t*>(pairAddr));
+      vValue_.emplace_back(pairAddr + sizeof(_size), _size);
+
+      // next pair
+      metaOffset += sizeof(pairOffset);
     }
   }
 
   Slice Key() override {
+    // TODO
+    // 读取一致性问题 是否要事务 防止flush时只读取到部分数据
     char *pairOffset = data_ + pair_offset.at(current_);
     size_t keySize = *(const_cast<size_t*>(pairOffset));
 
     char *dest;
     memcpy(dest, pairOffset + sizeof(keySize), keySize);
   }
+
   Slice Value() override {
+    // TODO
+    // 同 Key()
     char *pairOffset = data_ + pair_offset.at(current_);
     size_t keySize = *(const_cast<size_t*>(pairOffset));
 
@@ -52,7 +70,9 @@ class ChunkIterator : public InternalIterator {
   ~ChunkIterator();
 
   char *data_; // 数据起点
-  vector<char*> pair_offset;
+//  vector<char*> pair_offset;
+  vector<Slice> vKey_;
+  vector<Slice> vValue_;
   size_t current_;
 //  size_t nPairs;
 };
