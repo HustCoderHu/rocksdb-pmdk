@@ -42,10 +42,14 @@ stat & global bloom filter 保存在内存中，避免频繁更新
 # Range Mem Set
 管理结构，记录的只是 range mem tab
 
-申请一个 PMEMobjpool 其中一个 map 结构
-记录 key前缀 -> rangeMem 结构的映射
+申请一个 PMEMobjpool 其中一个 map 结构记录 key前缀 -> rangeMem 结构的映射
 
-
+key 的hash参考 cityhash
 
 # chunk 迭代
 返回的指针要通过 D_RO 读取数据 ?
+
+
+# reference
+cityhash
+<https://blog.csdn.net/yfkiss/article/details/7337382>  

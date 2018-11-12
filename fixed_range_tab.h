@@ -14,6 +14,8 @@
 
 namespace rocksdb {
 
+#define CHUNK_BLOOM_FILTER_SIZE 8
+
 using std::list;
 
 struct FixedRangeChunkBasedCacheStats {
@@ -22,7 +24,7 @@ struct FixedRangeChunkBasedCacheStats {
 //    std::vector<std::string*> chunk_bloom_data_;
 
     // 预设的range
-    Slice start, end;
+    Slice start_, end_;
 };
 
 class freqUpdateInfo {
@@ -47,12 +49,18 @@ public:
 
 class FixedRangeTab
 {
+  struct chunk_blk {
+      unsigned char bloom_filter[CHUNK_BLOOM_FILTER_SIZE];
+      size_t size;
+      char data[];
+  };
+
 public:
     FixedRangeTab();
     ~FixedRangeTab();
 
 public:
-    // 返回当前RangeMemtable中所哟chunk的有序序列
+    // 返回当前RangeMemtable中所有chunk的有序序列
     // 基于MergeIterator
     // 参考 DBImpl::NewInternalIterator
     InternalIterator* NewInternalIterator(ColumnFamilyData* cfd, Arena* arena);
@@ -99,12 +107,15 @@ private:
     unsigned int memid;
     std::string file_path;
 
+    // 每个 chunk block 的偏移
+//    vector<size_t> chunkBlkOffset;
+
+    char *data_;
+
     size_t chunk_sum_size;
     const size_t MAX_CHUNK_SUM_SIZE;
 
-    list<size_t> psttChunkList;
-
-
+//    list<size_t> psttChunkList;
 //    char *g_bloom_data;
 };
 

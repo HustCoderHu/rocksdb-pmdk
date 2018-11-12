@@ -28,6 +28,17 @@ PersistentRangeMemSet::~PersistentRangeMemSet()
     pmemobj_close(pop);
 }
 
+Status PersistentRangeMemSet::Get(const Slice &key, std::string *value)
+{
+  FixedRangeTab *tab;
+
+  // TODO
+  // 1. calc target FixedRangeTab
+  tab;
+  // 2.
+  return tab->Get(key, value);
+}
+
 } // namespace rocksdb
 
 

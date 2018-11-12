@@ -2,14 +2,6 @@
 
 namespace rocksdb {
 
-PersistentChunk::PersistentChunk()
-{
 
-}
-
-InternalIterator* PersistentChunk::NewInternalIterator()
-{
-
-}
 
 } // namespace rocksdb
