@@ -22,7 +22,7 @@ struct my_root {
 
 
 
-FixedRangeTab::FixedRangeTab()
+FixedRangeTab::FixedRangeTab(size_t chunk_count, char *data, int filterLen)
   : chunk_sum_size(0),
     MAX_CHUNK_SUM_SIZE(64 * 1024 * 1024),
     pop(nullptr)
@@ -36,10 +36,13 @@ FixedRangeTab::~FixedRangeTab()
 }
 
 //| used_bits ... | 预设 start | 预设 end |
+
+
 //| chunk blmFilter | chunk ...   |  不定长
 //| chunk blmFilter | chunk ...  |  不定长
 //| chunk blmFilter | chunk ...    |  不定长
 //| real_start | real_end |
+
 
 InternalIterator* FixedRangeTab::NewInternalIterator(
     ColumnFamilyData *cfd, Arena *arena)
@@ -56,8 +59,10 @@ InternalIterator* FixedRangeTab::NewInternalIterator(
 
   // TODO
   // 预设 range 持久化
-  char *chunkBlkOffset = data_ + sizeof(stat.used_bits_) + sizeof(stat.start_)
-      + sizeof(stat.end_);
+//  char *chunkBlkOffset = data_ + sizeof(stat.used_bits_) + sizeof(stat.start_)
+//      + sizeof(stat.end_);
+
+  char *chunkBlkOffset = data_;
 
   PersistentChunk pchk;
   for (int i = 0; i < info.chunk_num; ++i) {

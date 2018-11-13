@@ -18,13 +18,13 @@ namespace rocksdb {
 
 using std::list;
 
-struct FixedRangeChunkBasedCacheStats {
-    uint64_t  used_bits_;
+struct RangeStat {
+//    uint64_t  used_bits_;
 //    std::unordered_map<std::string, uint64_t> range_list_;
 //    std::vector<std::string*> chunk_bloom_data_;
 
     // 预设的range
-    Slice start_, end_;
+//    Slice start_, end_;
 };
 
 class freqUpdateInfo {
@@ -56,7 +56,7 @@ class FixedRangeTab
   };
 
 public:
-    FixedRangeTab();
+    FixedRangeTab(size_t chunk_count, char *data, int filterLen);
     ~FixedRangeTab();
 
 public:
@@ -101,7 +101,7 @@ private:
     FixedRangeTab(const FixedRangeTab&) = delete;
     FixedRangeTab& operator=(const FixedRangeTab&) = delete;
 
-    FixedRangeChunkBasedCacheStats stat;
+    RangeStat stat;
     freqUpdateInfo info;
 
     unsigned int memid;
