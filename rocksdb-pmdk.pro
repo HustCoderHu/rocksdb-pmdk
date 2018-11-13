@@ -4,10 +4,12 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += main.cpp \
-    persistent_range_mem_set.cpp \
     persistent_chunk.cpp \
     fixed_range_tab.cpp \
-    persistent_chunk_iterator.cpp
+    persistent_chunk_iterator.cpp \
+    persistent_hash_map.cpp \
+    pmem_hash_map.cpp \
+    fixed_range_chunk_based_nvm_write_cache.cpp
 
 HEADERS += \
     pmdk-include/libpmemobj/action.h \
@@ -84,13 +86,14 @@ HEADERS += \
     pmdk-include/libpmempool.h \
     pmdk-include/libvmem.h \
     pmdk-include/libvmmalloc.h \
-    persistent_range_mem_set.h \
     persistent_chunk.h \
     ex_common.h \
-    fixed_range_chunk_based_nvm_write_cache.h \
     fixed_range_iterator.h \
     fixed_range_tab.h \
-    persistent_chunk_iterator.h
+    persistent_chunk_iterator.h \
+    persistent_hash_map.h \
+    pmem_hash_map.h \
+    fixed_range_chunk_based_nvm_write_cache.h
 
 INCLUDEPATH += pmdk-include
 INCLUDEPATH += E:\github_repo\rocksdb\include
