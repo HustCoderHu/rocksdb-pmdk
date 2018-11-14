@@ -10,8 +10,7 @@
 #include <libpmemobj++/pool.hpp>
 
 #include <fixed_range_tab.h>
-
-
+#include <pmem_hash_map.h>
 
 namespace rocksdb {
 
@@ -39,7 +38,7 @@ public:
 
   // insert data to cache
   // insert_mark is (uint64_t)range_id
-  Status Insert(const Slice& cached_data, void* insert_mark) override;
+//  Status Insert(const Slice& cached_data, void* insert_mark) override;
 
   // get data from cache
   Status Get(const Slice& key, std::string* value) override;
@@ -49,7 +48,7 @@ public:
   Iterator* NewIterator() override;
 
   // 获取range_mem_id对应的RangeMemtable结构
-  FixedRangeTab* GetRangeMemtable(uint64_t range_mem_id);
+//  FixedRangeTab* GetRangeMemtable(uint64_t range_mem_id);
 
   // return there is need for compaction or not
   bool NeedCompaction() override {return !range_queue_.empty();}
@@ -72,12 +71,10 @@ private:
   const size_t POOLSIZE;
 
   //  persistent_queue<FixedRangeTab> range_mem_list_;
-  persistent_map<range, FixedRangeTab> range2tab;
+//  persistent_map<range, FixedRangeTab> range2tab;
   //  persistent_queue<uint64_t> compact_queue_;
 
-  pool<p_range::pmem_hashTab> pop;
-  //  PMEMobjpool *pop;
-  persistent_ptr<p_range::pmem_hashTab> pmem_ptr;
+  pool<p_range::pmem_hash_map> pop;
 
 private:
   const FixedRangeBasedOptions* internal_options_;
