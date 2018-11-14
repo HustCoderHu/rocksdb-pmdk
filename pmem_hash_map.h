@@ -16,30 +16,32 @@ using namespace pmem::obj;
 struct Node {
   p<uint64_t> hash_;
   persistent_ptr<Node> next;
-  p<size_t> prefixLen;
+  p<size_t> prefixLen; // string prefix_ tail 0 not included
   persistent_ptr<char[]> prefix_;
-  persistent_ptr<char[]> p_range;
+  p<size_t> bufSize_;
+  persistent_ptr<char[]> buf;
 };
 
 using p_node = persistent_ptr<Node>;
 
 class pmem_hash_map {
 public:
-//  struct p_map {
-    p<uint32_t> tabLen;
-    persistent_ptr<p_node[]> tab;
-    p<uint32_t> threshold;
-    p<uint32_t> size;
-//  };
-//  persistent_ptr<p_map> map_ = nullptr;
+  //  struct p_map {
+  p<uint32_t> tabLen;
+  persistent_ptr<p_node[]> tab;
+  p<float> loadFactor;
+  p<uint32_t> threshold;
+  p<uint32_t> size;
+  //  };
+  //  persistent_ptr<p_map> map_ = nullptr;
 
 
-  p_node get(size_t idx) {
-    return idx < size ? tab[idx] : nullptr;
-  }
+  persistent_ptr<char[]> get(const std::string& key, size_t prefixLen);
+
+  p_node getNode(uint64_t hash, const std::string& key);
 
   using std::string;
-  uint64_t put(pool_base& pop, const string& prefix);
+  uint64_t put(pool_base& pop, const string& prefix, size_t bufSize);
 };
 
 } // end of namespace p_range
