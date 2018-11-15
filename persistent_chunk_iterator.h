@@ -42,6 +42,8 @@ public:
 //    memcpy(dest, valsizeOffset + sizeof(valSize), valSize);
   }
 
+  void SeekToFirst() override { current_ = 0; }
+  void SeekToLast() override { current_ = vKey_.size() - 1; }
   bool Valid() override { return current_ < vKey_.size(); }
   void Next() override {
     assert(Valid());
