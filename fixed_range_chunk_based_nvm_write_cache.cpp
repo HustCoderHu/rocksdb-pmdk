@@ -74,6 +74,11 @@ Status FixedRangeChunkBasedNVMWriteCache::Get(const Slice &key, std::string *val
   return tab->Get(key, value);
 }
 
+void FixedRangeChunkBasedNVMWriteCache::addCompactionRangeTab(FixedRangeTab *tab)
+{
+  range_queue_.pu
+}
+
 uint64_t FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
 {
   // ( const void * key, int len, unsigned int seed );

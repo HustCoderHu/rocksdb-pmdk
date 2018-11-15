@@ -25,7 +25,7 @@ struct FixedRangeChunkBasedCacheStats{
 };
 
 struct CompactionItem {
-  FixedRange* pending_compated_range_;
+  FixedRangeTab* pending_compated_range_;
   Slice start_key_, end_key_;
   uint64_t range_size_, range_rum_;
 };
@@ -54,7 +54,13 @@ public:
   bool NeedCompaction() override {return !range_queue_.empty();}
 
   //get iterator of data that will be drained
-  CompactionItem* GetCompactionData();
+  // get 之后释放没有 ?
+  CompactionItem& GetCompactionData() {
+    CompactionItem *item = range_queue_.front();
+//    range_queue_.pop();
+    return item;
+  }
+  void addCompactionRangeTab(FixedRangeTab *tab);
 
   // add a range with a new prefix to range mem
   // return the id of the range
@@ -79,7 +85,7 @@ private:
 private:
   const FixedRangeBasedOptions* internal_options_;
   FixedRangeChunkBasedCacheStats* cache_stats_;
-  std::queue<CompactionItem*> range_queue_;
+  std::queue<CompactionItem> range_queue_;
   uint64_t range_seq_;
 };
 
