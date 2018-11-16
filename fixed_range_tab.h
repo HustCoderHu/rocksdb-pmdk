@@ -12,9 +12,12 @@
 
 #include <persistent_chunk.h>
 
+#include <pmem_hash_map.h>
+
 namespace rocksdb {
 
 #define CHUNK_BLOOM_FILTER_SIZE 8
+using pmem::obj::persistent_ptr;
 
 using std::list;
 
@@ -110,10 +113,12 @@ private:
     // 每个 chunk block 的偏移
 //    vector<size_t> chunkBlkOffset;
 
-    char *data_;
+//    persistent_ptr<char[]> buf_;
 
     size_t chunk_sum_size;
     const size_t MAX_CHUNK_SUM_SIZE;
+
+    p_range::p_node node_in_pmem_map;
 
 //    list<size_t> psttChunkList;
 //    char *g_bloom_data;
