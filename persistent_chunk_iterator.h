@@ -6,16 +6,24 @@
 #include <rocksdb/iterator.h>
 #include <table/merging_iterator.h>
 
+#include <libpmemobj++/persistent_ptr.hpp>
+
 namespace rocksdb {
 
 class PersistentChunkIterator : public InternalIterator
 {
   using std::vector;
+  using std::pair;
+  using namespace pmem::obj;
+
+  using p_buf = persistent_ptr<char[]>;
 public:
-  explicit PersistentChunkIterator(char *data, size_t size, Arena* arena);
+  explicit PersistentChunkIterator(p_buf data, size_t size, Arena* arena);
 
   Slice key() override {
-    return vKey_.at(current_);
+    Slice slc(vKey_.at(current_).second, vKey_.at(current_).first);
+    return slc;
+//    return vKey_.at(current_);
 
     // TODO
     // 读取一致性问题 是否要事务 防止flush时只读取到部分数据
@@ -27,7 +35,9 @@ public:
 //    memcpy(dest, pairOffset + sizeof(keySize), keySize);
   }
   Slice value() override {
-    return vValue_.at(current_);
+    Slice slc(vValue_.at(current_).second, vValue_.at(current_).first);
+    return slc;
+//    return vValue_.at(current_);
 
     // TODO
     // 同 Key()
@@ -54,11 +64,17 @@ public:
     --current_;
   }
 
-  char *data_; // 数据起点
+//  char *data_; // 数据起点
+  p_buf data_;
+
   Arena* arena_;
 //  vector<char*> pair_offset;
-  vector<Slice> vKey_;
-  vector<Slice> vValue_;
+//  vector<Slice> vKey_;
+//  vector<Slice> vValue_;
+
+
+  vector<pair<size_t, p_buf>> vKey_;
+  vector<pair<size_t, p_buf>> vValue_;
   size_t current_;
   //  size_t nPairs;
 };
