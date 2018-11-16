@@ -9,9 +9,14 @@
 fix range 文件
 ```
 | used_bits ... | 预设 start | 预设 end |
-| chunk blmFilter | chunk ...   |  不定长
-| chunk blmFilter | chunk ...  |  不定长
-| chunk blmFilter | chunk ...    |  不定长
+```
+
+```
+| chunk blmFilter | chunk len | data ...   |  不定长
+| chunk blmFilter | chunk len | data ...  |  不定长
+| chunk blmFilter | chunk len | data ...    |  不定长
+
+
 | real_start | real_end |
 ```
 布局思路，修改少的放在文件首部，频繁修改的放末尾，通过追加的方式修改，可能会有一点点的写放大
@@ -27,6 +32,9 @@ fix range 文件
 
 数据和索引更新一致性
 
+chunk 数量 总大小
+每个 chunk 的范围
+
 
 # chunk 安排
 连续写入到文件
@@ -36,8 +44,6 @@ fix range 文件
 ## 规避小写
 stat & global bloom filter 保存在内存中，避免频繁更新
 数据库恢复时重新计算，因为数据量很大，可以考虑使用 GPU
-
-
 
 # Range Mem Set
 管理结构，记录的只是 range mem tab
