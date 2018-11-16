@@ -13,14 +13,20 @@ pmem_hash_map::pmem_hash_map()
 persistent_ptr<char[]> pmem_hash_map::get(const std::string &key, size_t prefixLen)
 {
   p_node nod;
-  persistent_ptr<char[]> buf;
 
-  uint64_t _hash = CityHash64WithSeed(key, prefixLen, 16);
-  nod = getNode(_hash, key);
+//  uint64_t _hash = CityHash64WithSeed(key, prefixLen, 16);
+//  nod = getNode(_hash, key);
+  node = getNode(key, prefixLen);
 
   return nod == nullptr ? nullptr : nod->buf;
   // TODO
   // bufSize 需要么
+}
+
+p_node pmem_hash_map::getNode(const std::string &key, size_t prefixLen)
+{
+  uint64_t _hash = CityHash64WithSeed(key, prefixLen, 16);
+  return getNode(_hash, key);
 }
 
 p_node pmem_hash_map::getNode(uint64_t hash, const std::string &key)
@@ -64,7 +70,7 @@ uint64_t pmem_hash_map::put(pool_base &pop, const std::string &prefix,
 
       // TODO
       // buf = ?  range 分配多大空间
-      newhead->bufSize_ = bufSize
+      newhead->bufSize = bufSize
       newhead->buf = make_persistent<char[]>(bufSize);
 
       newhead->next = nod;

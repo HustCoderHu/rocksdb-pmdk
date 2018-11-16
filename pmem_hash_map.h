@@ -18,8 +18,9 @@ struct Node {
   persistent_ptr<Node> next;
   p<size_t> prefixLen; // string prefix_ tail 0 not included
   persistent_ptr<char[]> prefix_;
-  p<size_t> bufSize_;
+  p<size_t> bufSize; // capacity
   persistent_ptr<char[]> buf;
+  p<size_t> dataLen; // exact data len
 };
 
 using p_node = persistent_ptr<Node>;
@@ -38,6 +39,7 @@ public:
 
   persistent_ptr<char[]> get(const std::string& key, size_t prefixLen);
 
+  p_node getNode(const std::string& key, size_t prefixLen);
   p_node getNode(uint64_t hash, const std::string& key);
 
   using std::string;
