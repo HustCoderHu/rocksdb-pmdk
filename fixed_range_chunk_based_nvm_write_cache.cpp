@@ -12,6 +12,7 @@
 namespace rocksdb {
 
 using p_range::pmem_hash_map;
+using p_range::p_node;
 
 FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const string& file, const string& layout)
   :file_path(file)
@@ -22,7 +23,7 @@ FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const strin
   bool justCreated = false;
   if (file_exists(file_path) != 0) {
     pop = pool<pmem_hash_map>::create(file_path, LAYOUT, POOLSIZE, CREATE_MODE_RW);
-    justCreate = true;
+    justCreated = true;
 
   } else {
     pop = pool<pmem_hash_map>::open(file_path, LAYOUT);
@@ -87,7 +88,10 @@ uint64_t FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
   size_t bufSize = 1 << 26; // 64 MB
   uint64_t _hash;
   _hash = p_map->put(pop, prefix, bufSize);
-  return _hash;
+//  return _hash;
+
+  FixedRangeTab *range = new FixedRangeTab(p_map);
+  prefix2range.insert({prefix, range});
 }
 
 } // namespace rocksdb

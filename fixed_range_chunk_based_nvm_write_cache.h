@@ -3,6 +3,7 @@
 
 
 #include <queue>
+#include <unordered_map>
 #include <rocksdb/iterator.h>
 #include "utilities/nvm_write_cache/nvm_write_cache.h"
 #include "utilities/nvm_write_cache/nvm_cache_options.h"
@@ -15,6 +16,7 @@
 namespace rocksdb {
 
 using std::string;
+using std::unordered_map;
 using namespace pmem;
 using namespace pmem::obj;
 
@@ -81,12 +83,14 @@ private:
   //  persistent_queue<uint64_t> compact_queue_;
 
   pool<p_range::pmem_hash_map> pop;
+  unordered_map<string, FixedRangeTab> prefix2range;
 
 private:
   const FixedRangeBasedOptions* internal_options_;
   FixedRangeChunkBasedCacheStats* cache_stats_;
   std::queue<CompactionItem> range_queue_;
   uint64_t range_seq_;
+
 };
 
 } // namespace rocksdb
