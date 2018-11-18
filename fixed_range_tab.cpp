@@ -7,6 +7,7 @@
 namespace rocksdb {
 
 using pmem::obj::persistent_ptr;
+using p_range::p_node;
 #define MAX_BUF_LEN 4096
 
 //POBJ_LAYOUT_BEGIN(range_mem);
@@ -22,9 +23,10 @@ struct my_root {
 
 
 
-FixedRangeTab::FixedRangeTab(size_t chunk_count, char *data, int filterLen)
-  : chunk_sum_size(0),
-    MAX_CHUNK_SUM_SIZE(64 * 1024 * 1024)
+FixedRangeTab::FixedRangeTab(p_node node_in_pmem_map)
+  : chunk_sum_size(0)
+  , MAX_CHUNK_SUM_SIZE(64 * 1024 * 1024)
+  , node_in_pmem_map_(node_in_pmem_map)
 {
 
 }
@@ -54,7 +56,7 @@ InternalIterator* FixedRangeTab::NewInternalIterator(
 //  char *chunkBlkOffset = data_ + sizeof(stat.used_bits_) + sizeof(stat.start_)
 //      + sizeof(stat.end_);
 
-  persistent_ptr<char[]> chunkBlkOffset = node_in_pmem_map->buf;
+  persistent_ptr<char[]> chunkBlkOffset = node_in_pmem_map_->buf;
 
   PersistentChunk pchk;
   for (int i = 0; i < info.chunk_num; ++i) {
@@ -84,17 +86,17 @@ void FixedRangeTab::Append(const char *bloom_data,
   }
 
   // TODO
-  // 事务更换成 cpp ?
+  // 事务更换成 cpp binding ?
   // 开始追加
   TX_BEGIN(pop) {
     /* TX_STAGE_WORK */
-    rootp = POBJ_ROOT(pop, my_root);
-    size_t cur_len = node_in_pmem_map->dataLen;
+//    rootp = POBJ_ROOT(pop, my_root);
+    size_t cur_len = node_in_pmem_map_->dataLen;
     size_t chunk_blk_len = CHUNK_BLOOM_FILTER_SIZE + sizeof(chunk_data.size_)
         + chunk_data.size_;
     // 添加持久化范围
 //    TX_ADD_FIELD(rootp, length);
-    unsigned char *dest = node_in_pmem_map->buf + cur_len;
+    unsigned char *dest = node_in_pmem_map_->buf + cur_len;
     pmemobj_tx_add_range_direct(dest, chunk_blk_len);
     // 复制 chunk block
     memcpy(dest, bloom_data, CHUNK_BLOOM_FILTER_SIZE);
@@ -102,7 +104,7 @@ void FixedRangeTab::Append(const char *bloom_data,
     dest += CHUNK_BLOOM_FILTER_SIZE+sizeof(chunk_data.size_);
     memcpy(dest, chunk_data.data_, chunk_data.size_);
     // 更新总长度
-    node_in_pmem_map->dataLen = cur_len + chunk_blk_len;
+    node_in_pmem_map_->dataLen = cur_len + chunk_blk_len;
     chunk_sum_size += chunk_data.size_;
     // blk 偏移
 //    psttChunkList.push_back(cur_len);
