@@ -7,9 +7,9 @@ SOURCES += main.cpp \
     persistent_chunk.cpp \
     fixed_range_tab.cpp \
     persistent_chunk_iterator.cpp \
-    persistent_hash_map.cpp \
     pmem_hash_map.cpp \
-    fixed_range_chunk_based_nvm_write_cache.cpp
+    fixed_range_chunk_based_nvm_write_cache.cpp \
+    chunkblk.cpp
 
 HEADERS += \
     pmdk-include/libpmemobj/action.h \
@@ -91,9 +91,9 @@ HEADERS += \
     fixed_range_iterator.h \
     fixed_range_tab.h \
     persistent_chunk_iterator.h \
-    persistent_hash_map.h \
     pmem_hash_map.h \
-    fixed_range_chunk_based_nvm_write_cache.h
+    fixed_range_chunk_based_nvm_write_cache.h \
+    chunkblk.h
 
 INCLUDEPATH += pmdk-include
 INCLUDEPATH += E:\github_repo\rocksdb\include

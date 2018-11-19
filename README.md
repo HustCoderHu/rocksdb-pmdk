@@ -35,6 +35,10 @@ fix range 文件
 chunk 数量 总大小
 每个 chunk 的范围
 
+## compaction 触发
+rangeTab 申请的空间是开始就确定的，如果某次append达到空间上限，数据无法全部存下，被动触发 compaction  
+
+compaction 线程主动检测 rangeTab 状态
 
 # chunk 安排
 连续写入到文件
