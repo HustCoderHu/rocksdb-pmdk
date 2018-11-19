@@ -9,17 +9,21 @@
 //#include <table/merging_iterator.h>
 
 #include <libpmemobj.h>
+#include <libpmemobj++/pool.hpp>
 
+#include <chunkblk.h>
 #include <persistent_chunk.h>
-
 #include <pmem_hash_map.h>
 
 namespace rocksdb {
 
-#define CHUNK_BLOOM_FILTER_SIZE 8
-using pmem::obj::persistent_ptr;
-
+#define CHUNK_BLOOM_FILTER_LEN 8
 using std::list;
+
+//using namespace pmem;
+//using namespace pmem::obj;
+using pmem::obj::persistent_ptr;
+using pmem::obj::pool;
 
 struct RangeStat {
   //    uint64_t  used_bits_;
@@ -53,14 +57,14 @@ public:
 class FixedRangeTab
 {
   using p_range::p_node;
-  struct chunk_blk {
-    unsigned char bloom_filter[CHUNK_BLOOM_FILTER_SIZE];
-    size_t size;
-    char data[];
-  };
+//  struct chunk_blk {
+//    unsigned char bloom_filter[CHUNK_BLOOM_FILTER_LEN];
+//    size_t size;
+//    char data[];
+//  };
 
 public:
-  FixedRangeTab(p_node node_in_pmem_map_);
+  FixedRangeTab(pool<p_range::pmem_hash_map> *pop, p_node node_in_pmem_map);
   ~FixedRangeTab();
 
 public:
@@ -69,6 +73,8 @@ public:
   // 参考 DBImpl::NewInternalIterator
   InternalIterator* NewInternalIterator(ColumnFamilyData* cfd, Arena* arena);
   Status Get(const Slice& key, std::string *value);
+
+  void buildBlkList();
 
   // 返回当前RangeMemtable是否正在被compact
   bool IsCompactWorking();
@@ -119,8 +125,10 @@ private:
   size_t chunk_sum_size;
   const size_t MAX_CHUNK_SUM_SIZE;
 
+  pool<p_range::pmem_hash_map> *pop_;
   p_node node_in_pmem_map_;
 
+  vector<ChunkBlk> blklist;
   //    list<size_t> psttChunkList;
   //    char *g_bloom_data;
 };
