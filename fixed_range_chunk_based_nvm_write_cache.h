@@ -17,8 +17,9 @@ namespace rocksdb {
 
 using std::string;
 using std::unordered_map;
-using namespace pmem;
-using namespace pmem::obj;
+//using namespace pmem;
+//using namespace pmem::obj;
+using pmem::obj::pool;
 
 struct FixedRangeChunkBasedCacheStats{
   uint64_t  used_bits_;
@@ -45,7 +46,6 @@ public:
   // get data from cache
   Status Get(const Slice& key, std::string* value) override;
 
-
   // get iterator of the total cache
   Iterator* NewIterator() override;
 
@@ -57,10 +57,11 @@ public:
 
   //get iterator of data that will be drained
   // get 之后释放没有 ?
-  CompactionItem& GetCompactionData() {
-    CompactionItem *item = range_queue_.front();
+  CompactionItem GetCompactionData() {
+    CompactionItem &item = range_queue_.front();
 //    range_queue_.pop();
-    return item;
+    return item; // 一次拷贝构造
+    // 返回之后，即可 pop() 腾出空间
   }
   void addCompactionRangeTab(FixedRangeTab *tab);
 
@@ -90,7 +91,6 @@ private:
   FixedRangeChunkBasedCacheStats* cache_stats_;
   std::queue<CompactionItem> range_queue_;
   uint64_t range_seq_;
-
 };
 
 } // namespace rocksdb

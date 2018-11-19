@@ -46,7 +46,7 @@ p_node pmem_hash_map::getNode(uint64_t hash, const std::string &key)
 uint64_t pmem_hash_map::put(pool_base &pop, const std::string &prefix,
                             size_t bufSize) {
   // ( const void * key, int len, unsigned int seed );
-  uint64_t _hash = CityHash64WithSeed(prefix, prefix.size(), 16);
+  uint64_t _hash = CityHash64WithSeed(prefix, prefix.length(), 16);
 
   p_node nod = tab[_hash % tabLen];
 
@@ -64,12 +64,10 @@ uint64_t pmem_hash_map::put(pool_base &pop, const std::string &prefix,
       p_node newhead = make_persistent<p_node>();
 
       newhead->hash_ = _hash;
-      newhead->prefixLen = prefix.size();
-      newhead->prefix_ = make_persistent<char[]>(prefix.size()+1);
-      memcpy(newhead->prefix_, prefix.c_str(), prefix.size()+1);
+      newhead->prefixLen = prefix.length();
+      newhead->prefix_ = make_persistent<char[]>(prefix.length()+1);
+      memcpy(newhead->prefix_, prefix.c_str(), prefix.length()+1);
 
-      // TODO
-      // buf = ?  range 分配多大空间
       newhead->bufSize = bufSize
       newhead->buf = make_persistent<char[]>(bufSize);
 
@@ -81,6 +79,43 @@ uint64_t pmem_hash_map::put(pool_base &pop, const std::string &prefix,
     // 已经插入过了
   }
   return _hash;
+}
+
+p_node pmem_hash_map::putAndGet(pool_base &pop, const std::string &prefix, size_t bufSize)
+{
+  uint64_t _hash = CityHash64WithSeed(prefix, prefix.length(), 16);
+
+  p_node bucketHeadNode = tab[_hash % tabLen];
+
+  p_node try2find = bucketHeadNode;
+  while (try2find != nullptr) {
+    if (try2find->hash_ == _hash
+        && strcmp(try2find->prefix_, prefix.c_str()) == 0)
+      break;
+    try2find = try2find->next;
+  }
+
+  p_node newhead = try2find;
+  // 前缀没有被插入过
+  if (nullptr == try2find) {
+    transaction::run(pop, [&] {
+      newhead = make_persistent<p_node>();
+
+      newhead->hash_ = _hash;
+      newhead->prefixLen = prefix.length();
+      newhead->prefix_ = make_persistent<char[]>(prefix.length()+1);
+      memcpy(newhead->prefix_, prefix.c_str(), prefix.length()+1);
+
+      newhead->bufSize = bufSize
+      newhead->buf = make_persistent<char[]>(bufSize);
+
+      newhead->next = bucketHeadNode;
+      tab[_hash % tabLen] = newhead;
+    });
+  } else {
+    // 已经插入过了
+  }
+  return newhead;
 }
 
 } // end of namespace p_range

@@ -11,6 +11,9 @@
 
 namespace rocksdb {
 
+using pmem::obj::transaction;
+using pmem::obj::make_persistent;
+
 using p_range::pmem_hash_map;
 using p_range::p_node;
 
@@ -77,7 +80,7 @@ Status FixedRangeChunkBasedNVMWriteCache::Get(const Slice &key, std::string *val
 
 void FixedRangeChunkBasedNVMWriteCache::addCompactionRangeTab(FixedRangeTab *tab)
 {
-  range_queue_.pu
+//  range_queue_.pu
 }
 
 uint64_t FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
@@ -85,12 +88,16 @@ uint64_t FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
   // ( const void * key, int len, unsigned int seed );
 //  uint64_ _hash = CityHash64WithSeed(prefix, prefix.size(), 16);
   persistent_ptr<p_range::pmem_hash_map> p_map = pop.root();
+
+  // TODO
+  // buf = ?  range 分配多大空间
   size_t bufSize = 1 << 26; // 64 MB
-  uint64_t _hash;
-  _hash = p_map->put(pop, prefix, bufSize);
+//  uint64_t _hash;
+//  _hash = p_map->put(pop, prefix, bufSize);
+  p_node node_in_pmem_map = p_map->putAndGet(pop, prefix, bufSize);
 //  return _hash;
 
-  FixedRangeTab *range = new FixedRangeTab(p_map);
+  FixedRangeTab *range = new FixedRangeTab(p_map, node_in_pmem_map);
   prefix2range.insert({prefix, range});
 }
 

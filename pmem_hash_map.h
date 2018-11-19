@@ -23,6 +23,7 @@ struct Node {
   p<size_t> dataLen; // exact data len
 };
 
+//typedef persistent_ptr<Node> p_node;
 using p_node = persistent_ptr<Node>;
 
 class pmem_hash_map {
@@ -44,6 +45,7 @@ public:
 
   using std::string;
   uint64_t put(pool_base& pop, const string& prefix, size_t bufSize);
+  p_node putAndGet(pool_base& pop, const string& prefix, size_t bufSize);
 };
 
 } // end of namespace p_range
