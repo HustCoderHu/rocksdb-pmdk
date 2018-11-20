@@ -18,6 +18,10 @@ struct Node {
   persistent_ptr<Node> next;
   p<size_t> prefixLen; // string prefix_ tail 0 not included
   persistent_ptr<char[]> prefix_;
+  persistent_ptr<char[]> key_range_;
+  p<size_t> chunk_num_;
+  p<uint64_t> seq_num_;
+
   p<size_t> bufSize; // capacity
   persistent_ptr<char[]> buf;
   p<size_t> dataLen; // exact data len
