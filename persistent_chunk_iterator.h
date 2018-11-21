@@ -18,11 +18,13 @@ class PersistentChunkIterator : public InternalIterator
 
   using p_buf = persistent_ptr<char[]>;
 public:
-  explicit PersistentChunkIterator(p_buf data, size_t size, Arena* arena);
+  PersistentChunkIterator(p_buf data, size_t size, Arena* arena);
 
   Slice key() override {
-    Slice slc(vKey_.at(current_).second, vKey_.at(current_).first);
-    return slc;
+    _Dat_ &dat = vKey_.at(current_);
+    return Slice(dat.buf.get(), dat.size);
+//    Slice slc(dat.buf, dat.size);
+//    return slc;
 //    return vKey_.at(current_);
 
     // TODO
@@ -35,8 +37,10 @@ public:
 //    memcpy(dest, pairOffset + sizeof(keySize), keySize);
   }
   Slice value() override {
-    Slice slc(vValue_.at(current_).second, vValue_.at(current_).first);
-    return slc;
+    _Dat_ &dat = vValue_.at(current_);
+    return Slice(dat.buf.get(), dat.size);
+//    Slice slc(dat.buf, dat.size);
+//    return slc;
 //    return vValue_.at(current_);
 
     // TODO
@@ -54,6 +58,10 @@ public:
 
   void SeekToFirst() override { current_ = 0; }
   void SeekToLast() override { current_ = vKey_.size() - 1; }
+  // add by xiaohu
+  void SeekTo(size_t idx) { current_ = idx; }
+  void count() { return vKey_.size(); }
+
   bool Valid() override { return current_ < vKey_.size(); }
   void Next() override {
     assert(Valid());
@@ -72,9 +80,16 @@ public:
 //  vector<Slice> vKey_;
 //  vector<Slice> vValue_;
 
+  struct _Dat_{
+    size_t size;
+    p_buf buf;
+    _Dat_(size_t _size, p_buf _buf) : size(_size), buf(_buf) { }
+  };
 
-  vector<pair<size_t, p_buf>> vKey_;
-  vector<pair<size_t, p_buf>> vValue_;
+  vector<_Dat_> vKey_;
+  vector<_Dat_> vValue_;
+
+//  vector<pair<size_t, p_buf>> vKey_;
   size_t current_;
   //  size_t nPairs;
 };
