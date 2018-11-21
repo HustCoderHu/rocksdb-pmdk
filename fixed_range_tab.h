@@ -29,13 +29,11 @@ using pmem::obj::persistent_ptr;
 using pmem::obj::make_persistent;
 using pmem::obj::transaction;
 
-struct RangeStat {
-  //    uint64_t  used_bits_;
-  //    std::unordered_map<std::string, uint64_t> range_list_;
-  //    std::vector<std::string*> chunk_bloom_data_;
+struct Usage{
+  uint64_t chunk_num;
+  uint64_t range_size;
+  Slice start,end;
 
-  // 预设的range
-  //    Slice start_, end_;
 };
 
 struct freqUpdateInfo {
@@ -77,8 +75,8 @@ class FixedRangeTab
   //  };
 
 public:
-  FixedRangeTab(pool_base *pop, p_node node_in_pmem_map_, FixedRangeBasedOptions *options);
-  ~FixedRangeTab();
+  FixedRangeTab(pool_base& pop, p_node pmap_node, FixedRangeBasedOptions *options);
+  ~FixedRangeTab() = default;
 
 public:
   // 返回当前RangeMemtable中所有chunk的有序序列
@@ -95,6 +93,8 @@ public:
 
   // 返回当前RangeMemtable的Global Bloom Filter
   //    char* GetBloomFilter();
+  // 设置compaction状态
+  void SetCompactionWorking(bool working){in_compaction_ = working;}
 
   // 将新的chunk数据添加到RangeMemtable
   void Append(const char *bloom_data, const Slice& chunk_data,
@@ -111,6 +111,8 @@ public:
 
   // 判断是否需要compact，如果需要则将一个RangeMemid加入Compact队列
   void MaybeScheduleCompact();
+  
+  Usage RangeUsage();
 
   // 释放当前RangeMemtable的所有chunk以及占用的空间
   void Release();
@@ -121,18 +123,22 @@ public:
   FixedRangeTab(const FixedRangeTab&) = delete;
   FixedRangeTab& operator=(const FixedRangeTab&) = delete;
 
-//private:
-  Status DoInChunkSearch(InternalKeyComparator &icmp, const Slice &key, std::string *value,
-                         std::vector<uint64_t> &off, char *chunk_data);
+  //private:
+  uint64_t max_chunk_num_to_flush() const {
+    // TODO: set a max chunk num
+    return 100;
+  }
+  Status searchInChunk(PersistentChunkIterator *iter, InternalKeyComparator &icmp,
+                       const Slice &key, std::string *value);
 
   Slice GetKVData(char *raw, uint64_t item_off);
-
-  uint64_t max_chunk_num_to_flush() const { return 100; }
-
+  void CheckAndUpdateKeyRange(InternalKeyComparator* icmp, const Slice& new_start,
+                              const Slice& new_end);
 
   // persistent info
-  //  pool<p_range::pmem_hash_map> *pop_;
-  p_node node_in_pmem_map_;
+  p_node pmap_node;
+  pool_base& pop_;
+//  pool<p_range::pmem_hash_map> *pop_;
   persistent_ptr<freqUpdateInfo> range_info_;
 
   // volatile info
@@ -146,10 +152,10 @@ public:
   //    list<size_t> psttChunkList;
   //    char *g_bloom_data;
 
-//  RangeStat stat;
+  //  RangeStat stat;
   freqUpdateInfo info;
 
-//  unsigned int memid;
+  //  unsigned int memid;
   //  std::string file_path;
 
   // 每个 chunk block 的偏移
@@ -157,8 +163,8 @@ public:
 
   //    persistent_ptr<char[]> buf_;
 
-//  size_t chunk_sum_size;
-//  const size_t MAX_CHUNK_SUM_SIZE;
+  //  size_t chunk_sum_size;
+  //  const size_t MAX_CHUNK_SUM_SIZE;
 };
 
 } // namespace rocksdb
