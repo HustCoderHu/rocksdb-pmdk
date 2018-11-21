@@ -43,6 +43,8 @@ FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const strin
       _range_map->size = 0;
 
       pinfo_->range_map_ = _range_map;
+      // TODO
+      // PersistentAllocator 构造参数 ?
       pinfo_->allocator_ = make_persistent<PersistentAllocator>();
 
       pinfo_->inited_ = true;
@@ -85,12 +87,7 @@ Status FixedRangeChunkBasedNVMWriteCache::Get(const InternalKeyComparator &inter
   }
 }
 
-void FixedRangeChunkBasedNVMWriteCache::addCompactionRangeTab(FixedRangeTab *tab)
-{
-  //  range_queue_.pu
-}
-
-uint64_t FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
+void FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
 {
   // TODO
   // buf = ?  range 分配多大空间
@@ -102,6 +99,32 @@ uint64_t FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
 
   FixedRangeTab *range = new FixedRangeTab(pop_, node_in_pmem_map, option); // TODO
   vinfo_->prefix2range.insert({prefix, range});
+}
+
+void FixedRangeChunkBasedNVMWriteCache::MaybeNeedCompaction()
+{
+// TODO more reasonable compaction threashold
+        if(pinfo_->allocator_->Remain() < pinfo_->allocator_->Capacity() * 0.75){
+            uint64_t max_range_size = 0;
+            FixedRangeTab* pendding_range = nullptr;
+            Usage pendding_range_usage;
+            for(auto range : vinfo_->prefix2range){
+                Usage range_usage = range.second.RangeUsage();
+                if(max_range_size < range_usage.range_size){
+                    pendding_range = range.second;
+                    pendding_range_usage = range_usage;
+                }
+            }
+
+            CompactionItem* compaction_item = new CompactionItem;
+            compaction_item->pending_compated_range_ = pendding_range;
+            compaction_item->range_size_ = pendding_range_usage.range_size;
+            compaction_item->chunk_num_ = pendding_range_usage.chunk_num;
+            compaction_item->start_key_ = pendding_range_usage.start;
+            compaction_item->end_key_ = pendding_range_usage.end;
+
+            vinfo_->range_queue_.push(compaction_item);
+        }
 }
 
 void FixedRangeChunkBasedNVMWriteCache::AppendToRange(FixedRangeTab *tab,

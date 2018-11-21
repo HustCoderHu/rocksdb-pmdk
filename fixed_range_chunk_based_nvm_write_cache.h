@@ -17,9 +17,12 @@ namespace rocksdb {
 
 using std::string;
 using std::unordered_map;
-//using namespace pmem;
-//using namespace pmem::obj;
+
+using pmem::obj::pool_base;
 using pmem::obj::pool;
+using pmem::obj::persistent_ptr;
+using pmem::obj::make_persistent;
+using pmem::obj::transaction;
 
 struct FixedRangeChunkBasedCacheStats{
   uint64_t  used_bits_;
@@ -28,23 +31,23 @@ struct FixedRangeChunkBasedCacheStats{
 };
 
 struct CompactionItem {
-  FixedRangeTab* pending_compated_range_;
+  FixedRangeTab *pending_compated_range_;
   Slice start_key_, end_key_;
-  uint64_t range_size_, range_rum_;
+  uint64_t range_size_, chunk_num_;
 };
 
 class PersistentAllocator{
 public:
-  explicit PersistentAllocator(char* raw_space, uint64_t total_size){
+  explicit PersistentAllocator(persistent_ptr<char[]> raw_space, uint64_t total_size) {
     raw_ = raw_space;
     total_size_ = total_size;
     cur_ = 0;
   }
 
-  ~PersistentAllocator() =default;
+  ~PersistentAllocator() = default;
 
-  char* Allocate(size_t alloca_size){
-    char* alloc = raw_ + cur_;
+  persistent_ptr<char[]> Allocate(size_t alloca_size){
+    persistent_ptr<char[]> alloc = raw_ + cur_;
     cur_ = cur_ + alloca_size;
     return alloc;
   }
@@ -53,13 +56,17 @@ public:
     return total_size_ - cur_;
   }
 
+  uint64_t Capacity(){
+    return total_size_;
+  }
 
 private:
-  p<char*> raw_;
-  p<uint64_t > total_size_;
-  p<uint64_t > cur_;
+  persistent_ptr<char[]> raw_;
+  p<uint64_t> total_size_;
+  p<uint64_t> cur_;
 
 };
+
 class FixedRangeChunkBasedNVMWriteCache : public NVMWriteCache {
 public:
   explicit FixedRangeChunkBasedNVMWriteCache(const string &file, uint64_t pmem_size);
@@ -70,10 +77,10 @@ public:
   //  Status Insert(const Slice& cached_data, void* insert_mark) override;
 
   // get data from cache
-  Status Get(const InternalKeyComparator& internal_comparator, const Slice &key, std::string *value) override;
+  Status Get(const InternalKeyComparator& internal_comparator, const Slice &key,
+             std::string *value) override;
 
-  void AppendToRange(FixedRangeTab* tab,
-                     const char* bloom_data, const Slice& chunk_data,
+  void AppendToRange(FixedRangeTab* tab, const char* bloom_data, const Slice& chunk_data,
                      const Slice &new_start, const Slice &new_end);
   // get iterator of the total cache
   Iterator* NewIterator() override;
@@ -92,20 +99,26 @@ public:
     return item; // 一次拷贝构造
     // 返回之后，即可 pop() 腾出空间
   }
-  void addCompactionRangeTab(FixedRangeTab *tab);
+  //  void addCompactionRangeTab(FixedRangeTab *tab);
 
   // add a range with a new prefix to range mem
   // return the id of the range
-  uint64_t NewRange(const std::string& prefix);
+  //  uint64_t NewRange(const std::string& prefix);
+  void NewRange(const std::string& prefix);
 
   // get internal options of this cache
   const FixedRangeBasedOptions* internal_options(){return vinfo_->internal_options_;}
 
-  void MaybeScheduleCompaction();
+  void MaybeNeedCompaction();
+
+  unordered_map<string, FixedRangeTab*> GetRangeList(){return &vinfo_->prefix2range;}
 
   // get stats of this cache
-  //  FixedRangeChunkBasedCacheStats* stats(){return cache_stats_;}
+  //FixedRangeChunkBasedCacheStats *stats() { return cache_stats_; }
+
 private:
+  void RebuildFromPersistentNode();
+
   string file_path;
   const string LAYOUT;
   const size_t POOLSIZE;
@@ -130,7 +143,7 @@ private:
   VolatileInfo* vinfo_;
 
 private:
-  FixedRangeChunkBasedCacheStats* cache_stats_;
+  //  FixedRangeChunkBasedCacheStats* cache_stats_;
 };
 
 } // namespace rocksdb
