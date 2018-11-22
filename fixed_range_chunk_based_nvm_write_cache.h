@@ -24,17 +24,20 @@ using pmem::obj::persistent_ptr;
 using pmem::obj::make_persistent;
 using pmem::obj::transaction;
 
-struct FixedRangeChunkBasedCacheStats{
-  uint64_t  used_bits_;
-  std::unordered_map<std::string, uint64_t> range_list_;
-  std::vector<std::string*> chunk_bloom_data_;
-};
 
 struct CompactionItem {
   FixedRangeTab *pending_compated_range_;
-  Slice start_key_, end_key_;
+  //Slice start_key_, end_key_;
+  InternalKey start_key_, end_key_;
   uint64_t range_size_, chunk_num_;
 };
+
+struct ChunkMeta {
+  string prefix;
+  Slice cur_start;
+  Slice cur_end;
+};
+
 
 class PersistentAllocator{
 public:
@@ -69,7 +72,8 @@ private:
 
 class FixedRangeChunkBasedNVMWriteCache : public NVMWriteCache {
 public:
-  explicit FixedRangeChunkBasedNVMWriteCache(const string &file, uint64_t pmem_size);
+  explicit FixedRangeChunkBasedNVMWriteCache(const FixedRangeBasedOptions* ioptions,
+                                             const string &file, uint64_t pmem_size);
   ~FixedRangeChunkBasedNVMWriteCache();
 
   // insert data to cache
@@ -80,10 +84,11 @@ public:
   Status Get(const InternalKeyComparator& internal_comparator, const Slice &key,
              std::string *value) override;
 
-  void AppendToRange(FixedRangeTab* tab, const char* bloom_data, const Slice& chunk_data,
-                     const Slice &new_start, const Slice &new_end);
+  void AppendToRange(const InternalKeyComparator &icmp,
+                     const char* bloom_data, const Slice& chunk_data,
+                     const ChunkMeta &meta);
   // get iterator of the total cache
-  Iterator* NewIterator() override;
+  InternalIterator* NewIterator(const InternalKeyComparator *icmp, Arena *arena);
 
   // 获取range_mem_id对应的RangeMemtable结构
   //  FixedRangeTab* GetRangeMemtable(uint64_t range_mem_id);
@@ -101,10 +106,7 @@ public:
   }
   //  void addCompactionRangeTab(FixedRangeTab *tab);
 
-  // add a range with a new prefix to range mem
-  // return the id of the range
-  //  uint64_t NewRange(const std::string& prefix);
-  void NewRange(const std::string& prefix);
+  
 
   // get internal options of this cache
   const FixedRangeBasedOptions* internal_options(){return vinfo_->internal_options_;}
@@ -117,7 +119,13 @@ public:
   //FixedRangeChunkBasedCacheStats *stats() { return cache_stats_; }
 
 private:
+  // add a range with a new prefix to range mem
+  // return the id of the range
+  //  uint64_t NewRange(const std::string& prefix);
+  FixedRangeTab* NewRange(const std::string& prefix);
   void RebuildFromPersistentNode();
+
+  
 
   string file_path;
   const string LAYOUT;
@@ -133,11 +141,12 @@ private:
   pool<PersistentInfo> pop_;
   persistent_ptr<PersistentInfo> pinfo_;
 
-  struct VolatileInfo{
-    unordered_map<string, FixedRangeTab> prefix2range;
+  struct VolatileInfo {
     const FixedRangeBasedOptions *internal_options_;
-    std::queue<CompactionItem*> range_queue_;
-    uint64_t range_seq_;
+    unordered_map<string, FixedRangeTab> prefix2range;
+    std::queue<CompactionItem *> range_queue_;
+    explicit VolatileInfo(const FixedRangeBasedOptions* ioptions)
+      :internal_options_(ioptions) {}
   };
 
   VolatileInfo* vinfo_;

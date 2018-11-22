@@ -32,7 +32,7 @@ using p_range::p_node;
 
 FixedRangeTab::FixedRangeTab(pool_base& pop, p_node node_in_pmem_map,
                              FixedRangeBasedOptions *options)
-  : pmap_node(node_in_pmem_map)
+  : pmap_node_(node_in_pmem_map)
   , pop_(pop)
   , interal_options_(options)
   //  , chunk_sum_size(0)
@@ -40,7 +40,7 @@ FixedRangeTab::FixedRangeTab(pool_base& pop, p_node node_in_pmem_map,
   //  , pop_(pop)
   //  , node_in_pmem_map_(node_in_pmem_map)
 {
-  buildBlkList();
+  RebuildBlkList();
 
   transaction::run(pop, [&]{
     // TODO：range的初始化
@@ -69,19 +69,18 @@ FixedRangeTab::~FixedRangeTab()
 //| chunk blmFilter | chunk len | chunk data .| 不定长
 
 InternalIterator* FixedRangeTab::NewInternalIterator(
-    ColumnFamilyData *cfd, Arena *arena)
+    const InternalKeyComparator* icmp, Arena *arena)
 {
   InternalIterator* internal_iter;
-  MergeIteratorBuilder merge_iter_builder(&cfd->internal_comparator(),
-                                          arena);
+  MergeIteratorBuilder merge_iter_builder(icmp, arena);
   // TODO
   // 预设 range 持久化
   //  char *chunkBlkOffset = data_ + sizeof(stat.used_bits_) + sizeof(stat.start_)
   //      + sizeof(stat.end_);
   PersistentChunk pchk;
   for (ChunkBlk &blk : blklist) {
-    pchk.reset(CHUNK_BLOOM_FILTER_LEN, blk.chunkLen_,
-               pmap_node->buf + blk.getDatOffset());
+    pchk.reset(interal_options_->chunk_bloom_bits_, blk.chunkLen_,
+               pmap_node_->buf + blk.getDatOffset());
     merge_iter_builder.AddIterator(pchk.NewIterator(arena));
   }
 
@@ -89,62 +88,10 @@ InternalIterator* FixedRangeTab::NewInternalIterator(
   return internal_iter;
 }
 
-Status FixedRangeTab::Get(const InternalKeyComparator &internal_comparator,
-                          const Slice &key, std::string *value)
-{
-  // 1.从下往上遍历所有的chunk
-  PersistentChunkIterator *iter = new PersistentChunkIterator;
-  shared_ptr<PersistentChunkIterator> sp_persistent_chunk_iter(iter);
 
-  uint64_t bloom_bits = interal_options_->chunk_bloom_bits_;
-  for (size_t i = chunk_offset_.size() - 1; i >= 0; i--) {
-    ChunkBlk &blk = blklist.at(i);
-    persistent_ptr<char[]> bloom_dat = pmap_node->buf + blk.offset_;
-    // 2.获取当前chunk的bloom data，查找这个bloom data判断是否包含对应的key
-    if (interal_options_->filter_policy_->KeyMayMatch(key, Slice(bloom_dat.get(), bloom_bits))) {
-      // 3.如果有则读取元数据进行chunk内的查找
-      new (iter) PersistentChunkIterator(pmap_node->buf + blk.getDatOffset(), blk.chunkLen_,
-                                        nullptr);
-      Status &s = searchInChunk(iter, internal_comparator, key, value);
-      if (s.ok()) return s;
-    } else {
-      continue;
-    }
-  } // 4.循环直到查找完所有的chunk
-}
-
-void FixedRangeTab::buildBlkList()
-{
-  size_t dataLen;
-  dataLen = pmap_node->dataLen;
-
-  // TODO
-  // v0.1 range 从一开始就存 chunk ?
-  // v0.2 sizeof(cur_) + sizeof(seq_)
-  size_t offset = sizeof(size_t) << 1;
-  while(offset < dataLen) {
-    persistent_ptr<char[]> datChunkLen = pmap_node->buf + offset + CHUNK_BLOOM_FILTER_LEN;
-    size_t chunkLen = DecodeFixed64(datChunkLen.get());
-    blklist.emplace_back(offset, chunkLen);
-    // next chunk block
-    offset += CHUNK_BLOOM_FILTER_LEN + sizeof(chunkLen) + chunkLen;
-  }
-}
-
-/* range data format:
- *
- * |--  cur_  --|
- * |--  seq_  --|
- * |-- chunk1 --|
- * |-- chunk2 --|
- * |--   ...  --|
- *
- * */
-
-void FixedRangeTab::Append(const char *bloom_data,
-                           const Slice &chunk_data,
-                           const Slice &new_start,
-                           const Slice &new_end)
+void FixedRangeTab::Append(const InternalKeyComparator &icmp,
+                           const char *bloom_data, const Slice &chunk_data,
+                           const Slice &new_start, const Slice &new_end)
 {
   if (chunk_sum_size + chunk_data.size_ >= MAX_CHUNK_SUM_SIZE
       || info.chunk_num > ) {
@@ -155,20 +102,21 @@ void FixedRangeTab::Append(const char *bloom_data,
 
   // 开始追加
   transaction::run(pop_, [&] {
-    size_t cur_len = pmap_node->dataLen;
+    size_t cur_len = pmap_node_->dataLen;
     blklist.emplace_back(cur_len, chunk_data.size_);
 
-    persistent_ptr<char[]> dest = pmap_node->buf + cur_len;
+    persistent_ptr<char[]> dest = pmap_node_->buf + cur_len;
     memcpy(dest.get(), bloom_data, CHUNK_BLOOM_FILTER_LEN);
     dest += CHUNK_BLOOM_FILTER_LEN;
     EncodeFixed64(dest.get(), chunk_data.size_);
 
     dest += sizeof(chunk_data.size_);
     memcpy(dest.get(), chunk_data.data_, chunk_data.size_);
-    pmap_node->dataLen = cur_len + CHUNK_BLOOM_FILTER_LEN + sizeof(chunk_data.size_)
+    pmap_node_->dataLen = cur_len + CHUNK_BLOOM_FILTER_LEN + sizeof(chunk_data.size_)
         + chunk_data.size_;
   });
 
+  CheckAndUpdateKeyRange(icmp, new_start, new_end);
   return ;
 
   // TODO
@@ -176,12 +124,12 @@ void FixedRangeTab::Append(const char *bloom_data,
   //  TX_BEGIN(pop) {
   /* TX_STAGE_WORK */
   //    rootp = POBJ_ROOT(pop, my_root);
-  size_t cur_len = pmap_node->dataLen;
+  size_t cur_len = pmap_node_->dataLen;
   size_t chunk_blk_len = CHUNK_BLOOM_FILTER_LEN + sizeof(chunk_data.size_)
       + chunk_data.size_;
   // 添加持久化范围
   //    TX_ADD_FIELD(rootp, length);
-  unsigned char *dest = pmap_node->buf + cur_len;
+  unsigned char *dest = pmap_node_->buf + cur_len;
   pmemobj_tx_add_range_direct(dest, chunk_blk_len);
   // 复制 chunk block
   memcpy(dest, bloom_data, CHUNK_BLOOM_FILTER_LEN);
@@ -189,7 +137,7 @@ void FixedRangeTab::Append(const char *bloom_data,
   dest += CHUNK_BLOOM_FILTER_LEN+sizeof(chunk_data.size_);
   memcpy(dest, chunk_data.data_, chunk_data.size_);
   // 更新总长度
-  pmap_node->dataLen = cur_len + chunk_blk_len;
+  pmap_node_->dataLen = cur_len + chunk_blk_len;
   chunk_sum_size += chunk_data.size_;
   // blk 偏移
   //    psttChunkList.push_back(cur_len);
@@ -207,40 +155,18 @@ void FixedRangeTab::Append(const char *bloom_data,
   //  } TX_END
 }
 
-void FixedRangeTab::GetRealRange(Slice &real_start, Slice &real_end)
-{
-  real_start = GetKVData(&range_info_->real_start_[0], 0);
-  real_end = GetKVData(&range_info_->real_end_[0], 0);
-}
-
-Usage FixedRangeTab::RangeUsage()
-{
-  Usage usage;
-  usage.range_size = pmap_node_->total_size_;
-  usage.chunk_num = pmap_node_->chunk_num_;
-  GetRealRange(usage.start, usage.end);
-  return usage;
-}
-
-Slice FixedRangeTab::GetKVData(char *raw, uint64_t item_off)
-{
-  char* target = raw + item_off;
-  uint64_t target_size = DecodeFixed64(target);
-  return Slice(target + sizeof(uint64_t), target_size);
-}
-
-void FixedRangeTab::CheckAndUpdateKeyRange(InternalKeyComparator *icmp, const Slice &new_start,
+void FixedRangeTab::CheckAndUpdateKeyRange(const InternalKeyComparator &icmp, const Slice &new_start,
                                            const Slice &new_end)
 {
   Slice cur_start, cur_end;
   bool update_start = false, update_end = false;
   GetRealRange(cur_start, cur_end);
-  if(icmp->Compare(cur_start, new_start) > 0){
+  if(icmp.Compare(cur_start, new_start) > 0){
     cur_start = new_start;
     update_start = true;
   }
 
-  if(icmp->Compare(cur_end, new_end) < 0){
+  if(icmp.Compare(cur_end, new_end) < 0){
     cur_end = new_end;
     update_end = true;
   }
@@ -263,10 +189,28 @@ void FixedRangeTab::CheckAndUpdateKeyRange(InternalKeyComparator *icmp, const Sl
   }
 }
 
-void FixedRangeTab::Release()
+Status FixedRangeTab::Get(const InternalKeyComparator &internal_comparator,
+                          const Slice &key, std::string *value)
 {
-  //TODO: release
-  // 删除这个range
+  // 1.从下往上遍历所有的chunk
+  PersistentChunkIterator *iter = new PersistentChunkIterator;
+  shared_ptr<PersistentChunkIterator> sp_persistent_chunk_iter(iter);
+
+  uint64_t bloom_bits = interal_options_->chunk_bloom_bits_;
+  for (size_t i = chunk_offset_.size() - 1; i >= 0; i--) {
+    ChunkBlk &blk = blklist.at(i);
+    persistent_ptr<char[]> bloom_dat = pmap_node_->buf + blk.offset_;
+    // 2.获取当前chunk的bloom data，查找这个bloom data判断是否包含对应的key
+    if (interal_options_->filter_policy_->KeyMayMatch(key, Slice(bloom_dat.get(), bloom_bits))) {
+      // 3.如果有则读取元数据进行chunk内的查找
+      new (iter) PersistentChunkIterator(pmap_node_->buf + blk.getDatOffset(), blk.chunkLen_,
+                                         nullptr);
+      Status &s = searchInChunk(iter, internal_comparator, key, value);
+      if (s.ok()) return s;
+    } else {
+      continue;
+    }
+  } // 4.循环直到查找完所有的chunk
 }
 
 Status FixedRangeTab::searchInChunk(PersistentChunkIterator *iter,
@@ -275,7 +219,7 @@ Status FixedRangeTab::searchInChunk(PersistentChunkIterator *iter,
 {
   size_t left = 0, right = iter->count() - 1;
   while (left < right) {
-    size_t middle = left + (right - left) >> 1;
+    size_t middle = left + ((right - left) >> 1);
     iter->SeekTo(middle);
     Slice& ml_key = iter->key();
     int result = icmp.Compare(ml_key, key);
@@ -293,6 +237,85 @@ Status FixedRangeTab::searchInChunk(PersistentChunkIterator *iter,
     }
   }
   return Status::NotFound("not found");
+}
+
+void FixedRangeTab::RebuildBlkList()
+{
+  // TODO :check consistency
+  //ConsistencyCheck();
+  size_t dataLen;
+  dataLen = pmap_node_->dataLen;
+
+  // TODO
+  // v0.1 range 从一开始就存 chunk ?
+  // v0.2 sizeof(cur_) + sizeof(seq_)
+  size_t offset = sizeof(size_t) << 1;
+  while(offset < dataLen) {
+    persistent_ptr<char[]> datChunkLen = pmap_node_->buf + offset + CHUNK_BLOOM_FILTER_LEN;
+    size_t chunkLen = DecodeFixed64(datChunkLen.get());
+    blklist.emplace_back(offset, chunkLen);
+    // next chunk block
+    offset += CHUNK_BLOOM_FILTER_LEN + sizeof(chunkLen) + chunkLen;
+  }
+}
+
+/* range data format:
+ *
+ * |--  cur_  --|
+ * |--  seq_  --|
+ * |-- chunk1 --|
+ * |-- chunk2 --|
+ * |--   ...  --|
+ *
+ * */
+
+
+void FixedRangeTab::GetRealRange(Slice &real_start, Slice &real_end)
+{
+  char *raw = pmap_node_->key_range_.get();
+  real_start = GetKVData(raw, 0);
+  real_end = GetKVData(raw, real_start.size() + sizeof(uint64_t));
+}
+
+Slice FixedRangeTab::GetKVData(char *raw, uint64_t item_off)
+{
+  char *target = raw + item_off;
+  uint64_t target_size = DecodeFixed64(target);
+  return Slice(target + sizeof(uint64_t), target_size);
+}
+
+
+Usage FixedRangeTab::RangeUsage()
+{
+  Usage usage;
+  usage.range_size = pmap_node_->total_size_;
+  usage.chunk_num = pmap_node_->chunk_num_;
+  GetRealRange(usage.start, usage.end);
+  return usage;
+}
+
+void FixedRangeTab::ConsistencyCheck() {
+  uint64_t data_seq_num;
+  data_seq_num = DecodeFixed64(raw_ - sizeof(uint64_t));
+  p_range::Node* vnode = pmap_node_.get();
+  if(data_seq_num != vnode->seq_num_){
+    // TODO:又需要一个comparator
+    /*Slice last_start, last_end;
+        GetLastChunkKeyRange(last_start, last_end);*/
+  }
+}
+
+
+void FixedRangeTab::Release()
+{
+  //TODO: release
+  // 删除这个range
+}
+
+void FixedRangeTab::CleanUp()
+{
+  pmap_node_->dataLen = 0;
+  RebuildBlkList();
 }
 
 } // namespace rocksdb

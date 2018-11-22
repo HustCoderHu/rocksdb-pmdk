@@ -75,18 +75,18 @@ class FixedRangeTab
   //  };
 
 public:
-  FixedRangeTab(pool_base& pop, p_node pmap_node, FixedRangeBasedOptions *options);
+  FixedRangeTab(pool_base& pop, p_node pmap_node_, FixedRangeBasedOptions *options);
   ~FixedRangeTab() = default;
 
 public:
   // 返回当前RangeMemtable中所有chunk的有序序列
   // 基于MergeIterator
   // 参考 DBImpl::NewInternalIterator
-  InternalIterator* NewInternalIterator(ColumnFamilyData* cfd, Arena* arena);
+  InternalIterator* NewInternalIterator(const InternalKeyComparator *icmp, Arena* arena);
   Status Get(const InternalKeyComparator &internal_comparator, const Slice &key,
              std::string *value);
 
-  void buildBlkList();
+  void RebuildBlkList();
 
   // 返回当前RangeMemtable是否正在被compact
   bool IsCompactWorking() { return in_compaction_; }
@@ -97,20 +97,24 @@ public:
   void SetCompactionWorking(bool working){in_compaction_ = working;}
 
   // 将新的chunk数据添加到RangeMemtable
-  void Append(const char *bloom_data, const Slice& chunk_data,
+  void Append(const InternalKeyComparator& icmp, const char *bloom_data, const Slice& chunk_data,
               const Slice& new_start, const Slice& new_end);
+  void CheckAndUpdateKeyRange(const InternalKeyComparator &icmp, const Slice& new_start,
+                              const Slice& new_end);
 
   // 更新当前RangeMemtable的Global Bloom Filter
   //    void SetBloomFilter(char* bloom_data);
 
   // 返回当前RangeMem的真实key range（stat里面记录）
   void GetRealRange(Slice& real_start, Slice& real_end);
+  Slice GetKVData(char *raw, uint64_t item_off);
+
 
   // 更新当前RangeMemtable的状态
   //  void UpdateStat(const Slice& new_start, const Slice& new_end);
 
   // 判断是否需要compact，如果需要则将一个RangeMemid加入Compact队列
-  void MaybeScheduleCompact();
+//  void MaybeScheduleCompact();
   
   Usage RangeUsage();
 
@@ -132,11 +136,11 @@ public:
                        const Slice &key, std::string *value);
 
   Slice GetKVData(char *raw, uint64_t item_off);
-  void CheckAndUpdateKeyRange(InternalKeyComparator* icmp, const Slice& new_start,
-                              const Slice& new_end);
 
+
+  void ConsistencyCheck();
   // persistent info
-  p_node pmap_node;
+  p_node pmap_node_;
   pool_base& pop_;
 //  pool<p_range::pmem_hash_map> *pop_;
   persistent_ptr<freqUpdateInfo> range_info_;

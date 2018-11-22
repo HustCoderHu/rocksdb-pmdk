@@ -17,11 +17,13 @@ using pmem::obj::make_persistent;
 using p_range::pmem_hash_map;
 using p_range::p_node;
 
-FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const string& file, uint64_t pmem_size)
+FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const FixedRangeBasedOptions *ioptions,
+                                                                     const string& file, uint64_t pmem_size)
   :file_path(file)
   ,LAYOUT("FixedRangeChunkBasedNVMWriteCache")
   ,POOLSIZE(1 << 26) // TODO
 {
+  vinfo_ = new VolatileInfo(ioptions);
   //  bool justCreated = false;
   if (file_exists(file_path.c_str()) != 0) {
     pop_ = pool<PersistentInfo>::create(file_path, LAYOUT, pmem_size, CREATE_MODE_RW);
@@ -49,6 +51,8 @@ FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const strin
 
       pinfo_->inited_ = true;
     });
+  }else{
+    RebuildFromPersistentNode();
   }
 
   //  if (file_exists(file_path) != 0) {
@@ -68,6 +72,7 @@ FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const strin
 
 FixedRangeChunkBasedNVMWriteCache::~FixedRangeChunkBasedNVMWriteCache()
 {
+  delete vinfo_;
   if (pop_)
     pop_.close();
   //    pmemobj_close(pop);
@@ -87,7 +92,27 @@ Status FixedRangeChunkBasedNVMWriteCache::Get(const InternalKeyComparator &inter
   }
 }
 
-void FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
+void FixedRangeChunkBasedNVMWriteCache::AppendToRange(const InternalKeyComparator &icmp,
+                                                      const char *bloom_data, const Slice &chunk_data,
+                                                      const ChunkMeta &meta)
+{
+  /*
+   * 1. 获取prefix
+   * 2. 检查tab是否存在
+   * 2.1 tab不存在则NewRange
+   * 3. 调用tangetab的append
+   * */
+  FixedRangeTab* now_range = nullptr;
+  auto tab_found = vinfo_->prefix2range.find(meta.prefix);
+  if(tab_found == vinfo_->prefix2range.end()){
+    now_range = NewRange(meta.prefix);
+  }else{
+    now_range = &tab_found->second;
+  }
+  now_range->Append(icmp, bloom_data, chunk_data, meta.cur_start, meta.cur_end);
+}
+
+FixedRangeTab* FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
 {
   // TODO
   // buf = ?  range 分配多大空间
@@ -99,42 +124,73 @@ void FixedRangeChunkBasedNVMWriteCache::NewRange(const std::string &prefix)
 
   FixedRangeTab *range = new FixedRangeTab(pop_, node_in_pmem_map, option); // TODO
   vinfo_->prefix2range.insert({prefix, range});
+  return range;
 }
 
 void FixedRangeChunkBasedNVMWriteCache::MaybeNeedCompaction()
 {
-// TODO more reasonable compaction threashold
-        if(pinfo_->allocator_->Remain() < pinfo_->allocator_->Capacity() * 0.75){
-            uint64_t max_range_size = 0;
-            FixedRangeTab* pendding_range = nullptr;
-            Usage pendding_range_usage;
-            for(auto range : vinfo_->prefix2range){
-                Usage range_usage = range.second.RangeUsage();
-                if(max_range_size < range_usage.range_size){
-                    pendding_range = range.second;
-                    pendding_range_usage = range_usage;
-                }
-            }
+  // TODO more reasonable compaction threashold
+  if(pinfo_->allocator_->Remain() < pinfo_->allocator_->Capacity() * 0.75){
+    uint64_t max_range_size = 0;
+    FixedRangeTab* pendding_range = nullptr;
+    Usage pendding_range_usage;
+    for(auto range : vinfo_->prefix2range){
+      Usage range_usage = range.second.RangeUsage();
+      if(max_range_size < range_usage.range_size){
+        pendding_range = range.second;
+        pendding_range_usage = range_usage;
+      }
+    }
 
-            CompactionItem* compaction_item = new CompactionItem;
-            compaction_item->pending_compated_range_ = pendding_range;
-            compaction_item->range_size_ = pendding_range_usage.range_size;
-            compaction_item->chunk_num_ = pendding_range_usage.chunk_num;
-            compaction_item->start_key_ = pendding_range_usage.start;
-            compaction_item->end_key_ = pendding_range_usage.end;
+    CompactionItem* compaction_item = new CompactionItem;
+    compaction_item->pending_compated_range_ = pendding_range;
+    compaction_item->range_size_ = pendding_range_usage.range_size;
+    compaction_item->chunk_num_ = pendding_range_usage.chunk_num;
+    compaction_item->start_key_.DecodeFrom(pendding_range_usage.start);
+    compaction_item->end_key_.DecodeFrom(pendding_range_usage.end);
 
-            vinfo_->range_queue_.push(compaction_item);
-        }
+    vinfo_->range_queue_.push(compaction_item);
+  }
 }
 
-void FixedRangeChunkBasedNVMWriteCache::AppendToRange(FixedRangeTab *tab,
-                                                      const char *bloom_data,
-                                                      const Slice &chunk_data,
-                                                      const Slice &new_start,
-                                                      const Slice &new_end)
+void FixedRangeChunkBasedNVMWriteCache::RebuildFromPersistentNode()
 {
-  tab->Append(pop_, bloom_data, chunk_data, new_start, new_end);
+  // 遍历每个Node，重建vinfo中的prefix2range
+  // 遍历pmem_hash_map中的每个tab，每个tab是一个p_node指针数组
+  pmem_hash_map* vhash_map = pinfo_->range_map_.get();
+
+  size_t hash_map_size = vhash_map->tabLen;
+
+  for(size_t i = 0; i < hash_map_size; i++){
+    p_node pnode = vhash_map->tab[i];
+    if(pnode != nullptr){
+      p_node tmp = pnode;
+      do{
+        // 重建FixedRangeTab
+        FixedRangeTab* recovered_tab = new FixedRangeTab(pop_, tmp, vinfo_->internal_options_);
+        p_range::Node* tmp_node = tmp.get();
+        std::string prefix(tmp_node->prefix_.get(), tmp_node->prefixLen);
+        vinfo_->prefix2range[prefix] = recovered_tab;
+        tmp = tmp_node->next;
+      }while(tmp != nullptr);
+    }
+  }
 }
+
+InternalIterator *FixedRangeChunkBasedNVMWriteCache::NewIterator(const InternalKeyComparator* icmp,
+                                                                 Arena* arena)
+{
+  // TODO:NewIterator
+  InternalIterator* internal_iter;
+  MergeIteratorBuilder merge_iter_builder(icmp, arena);
+  for (auto range : vinfo_->prefix2range) {
+    merge_iter_builder.AddIterator(range.second.NewInternalIterator(icmp, arena));
+  }
+
+  internal_iter = merge_iter_builder.Finish();
+  return internal_iter;
+}
+
 } // namespace rocksdb
 
 
