@@ -5,19 +5,27 @@
 
 namespace rocksdb {
 
-class ChunkBlk
-{
+/* *
+ * --------------
+ * | bloom data | // bloom_bits
+ * --------------
+ * | chunk  len | // sizeof(size_t)
+ * --------------
+ * | chunk data | // chunkLen
+ * --------------
+ * */
+class ChunkBlk {
 public:
-//  | chunk blmFilter | chunk len | data ...   |  不定长
-  explicit ChunkBlk(size_t offset, size_t chunkLen)
-    :offset_(offset), chunkLen_(chunkLen) {
+  explicit ChunkBlk(size_t bloom_bits, size_t offset, size_t chunkLen)
+    : bloom_bits_(bloom_bits), offset_(offset), chunkLen_(chunkLen) {
 
   }
 
   size_t getDatOffset() {
-    return offset_ + CHUNK_BLOOM_FILTER_SIZE + sizeof(chunkLen_);
+    return offset_ + bloom_bits_ + sizeof(chunkLen_);
   }
 
+  size_t bloom_bits_;
   size_t offset_; // offset of bloom filter in range buffer
   size_t chunkLen_;
 

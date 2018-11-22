@@ -77,7 +77,7 @@ p_node pmem_hash_map::putAndGet(pool_base &pop, const std::string &prefix, size_
       // TODO
       // key_range_ ?
       // seq_num_ ?
-      newhead->key_range_ = make_persistent<char[]>(?);
+      newhead->key_range_ = nullptr;
       newhead->chunk_num_ = 0;
       newhead->seq_num_ = ?;
 
