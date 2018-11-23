@@ -3,6 +3,9 @@
 
 #include <list>
 
+//#include "city.h"
+// https://blog.csdn.net/yfkiss/article/details/7337382
+
 #include <db/db_impl.h>
 //#include <rocksdb/slice.h>
 //#include <rocksdb/iterator.h>
@@ -21,13 +24,41 @@ namespace rocksdb {
 #define CHUNK_BLOOM_FILTER_LEN 8
 using std::list;
 
-//using namespace pmem;
-//using namespace pmem::obj;
+using pmem::obj::p;
 using pmem::obj::pool_base;
 using pmem::obj::pool;
 using pmem::obj::persistent_ptr;
 using pmem::obj::make_persistent;
 using pmem::obj::transaction;
+
+using p_buf = persistent_ptr<char[]>;
+
+struct NvRangeTab {
+  using std::string;
+public:
+  NvRangeTab(pool_base &pop, const string &prefix);
+  uint64_t hashCode() {
+    // TODO \0 ?
+    std::string key(prefix_.get(), prefixLen + 1);
+    return CityHash64WithSeed(key, prefixLen, 16);
+  }
+
+  bool equals(const string &prefix);
+  bool equals(p_buf &prefix, size_t len);
+  bool equals(NvRangeTab &b);
+
+  p<uint64_t> hash_;
+  p<size_t> prefixLen; // string prefix_ tail 0 not included
+  p_buf prefix_;
+  p_buf key_range_;
+  p<size_t> chunk_num_;
+  p<uint64_t> seq_num_;
+
+  p<size_t> bufSize; // capacity
+  p_buf buf;
+  p<size_t> dataLen; // exact data len
+
+};
 
 struct Usage{
   uint64_t chunk_num;
@@ -75,10 +106,18 @@ class FixedRangeTab
   //  };
 
 public:
+  FixedRangeTab(pool_base& pop, FixedRangeBasedOptions *options);
+  FixedRangeTab(pool_base& pop, FixedRangeBasedOptions *options,
+                persistent_ptr<NvRangeTab> &nonVolatileTab);
   FixedRangeTab(pool_base& pop, p_node pmap_node_, FixedRangeBasedOptions *options);
+
+//  FixedRangeTab(pool_base& pop, p_node pmap_node_, FixedRangeBasedOptions *options);
+
   ~FixedRangeTab() = default;
 
 public:
+  void reservePersistent();
+
   // 返回当前RangeMemtable中所有chunk的有序序列
   // 基于MergeIterator
   // 参考 DBImpl::NewInternalIterator
@@ -87,6 +126,7 @@ public:
              std::string *value);
 
   void RebuildBlkList();
+  persistent_ptr<NvRangeTab> getPersistentData() { return nonVolatileTab; }
 
   // 返回当前RangeMemtable是否正在被compact
   bool IsCompactWorking() { return in_compaction_; }
@@ -141,6 +181,8 @@ public:
   void ConsistencyCheck();
   // persistent info
   p_node pmap_node_;
+
+  persistent_ptr<NvRangeTab> nonVolatileTab;
   pool_base& pop_;
 //  pool<p_range::pmem_hash_map> *pop_;
   persistent_ptr<freqUpdateInfo> range_info_;
@@ -165,7 +207,7 @@ public:
   // 每个 chunk block 的偏移
   //    vector<size_t> chunkBlkOffset;
 
-  //    persistent_ptr<char[]> buf_;
+  //    p_buf buf_;
 
   //  size_t chunk_sum_size;
   //  const size_t MAX_CHUNK_SUM_SIZE;
