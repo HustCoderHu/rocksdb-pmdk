@@ -35,6 +35,12 @@ fix range 文件
 chunk 数量 总大小
 每个 chunk 的范围
 
+## 读写竞争
+比如 compact 结束时的 cleanup 和 追加，方案有很多种
+比如
+- 两块空间交替
+- 循环空间首尾标记
+
 ## compaction 触发
 rangeTab 申请的空间是开始就确定的，如果某次append达到空间上限，数据无法全部存下，被动触发 compaction  
 
