@@ -47,7 +47,7 @@ FixedRangeChunkBasedNVMWriteCache::FixedRangeChunkBasedNVMWriteCache(const Fixed
       pinfo_->range_map_ = _range_map;
       // TODO
       // PersistentAllocator 构造参数 ?
-      pinfo_->allocator_ = make_persistent<PersistentAllocator>();
+      pinfo_->allocator_ = make_persistent<PersistentAllocator>(data_space, pmem_size);
 
       pinfo_->inited_ = true;
     });

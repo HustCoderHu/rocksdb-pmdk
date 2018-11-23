@@ -20,6 +20,7 @@ using std::unordered_map;
 
 using pmem::obj::pool_base;
 using pmem::obj::pool;
+using pmem::obj::p;
 using pmem::obj::persistent_ptr;
 using pmem::obj::make_persistent;
 using pmem::obj::transaction;
@@ -124,8 +125,6 @@ private:
   //  uint64_t NewRange(const std::string& prefix);
   FixedRangeTab* NewRange(const std::string& prefix);
   void RebuildFromPersistentNode();
-
-  
 
   string file_path;
   const string LAYOUT;
