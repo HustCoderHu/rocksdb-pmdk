@@ -1,5 +1,7 @@
 #include "pmem_hash_map.h"
 
+using pmem::obj::transaction;
+
 //#include "city.h"
 // https://blog.csdn.net/yfkiss/article/details/7337382
 
@@ -8,6 +10,39 @@ namespace p_range {
 pmem_hash_map::pmem_hash_map()
 {
 
+}
+
+template<typename T>
+void pmem_hash_map::getAll(vector<persistent_ptr<T> > &nodeVec)
+{
+  size_t tablen = tabLen;
+  for (int i = 0; i < tablen; ++i) {
+    p_node_t node = tab_[i];
+
+    while (node != nullptr) {
+      nodeVec.push_back(node->p_content);
+      node = node->next;
+    }
+  }
+}
+
+template<typename T>
+bool pmem_hash_map::put(pmem::obj::pool_base &pop, persistent_ptr<T> &p_content)
+{
+  // 调用者自己构建 map ，检查是否已经有同样的 key
+  uint64_t _hash = p_content->hashCode();
+  p_node_t bucketHeadNode = tab_[_hash % tabLen];
+
+  p_node_t newhead;
+  if (nullptr == bucketHeadNode) {
+    transaction::run(pop, [&] {
+      newhead = make_persistent<p_node>();
+      newhead->p_content = p_content;
+      newhead->next = nullptr;
+      tab[_hash % tabLen] = newhead;
+    });
+  }
+  return true;
 }
 
 persistent_ptr<char[]> pmem_hash_map::get(const std::string &key, size_t prefixLen)
