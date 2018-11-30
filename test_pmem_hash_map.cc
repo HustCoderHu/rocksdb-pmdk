@@ -64,7 +64,6 @@ int main(int argc, char* argv[])
 
   // 至少一个参数，就 put
   if (argc > 1) {
-
     for (int i = 0; i < 13; ++i) {
       int val = 2 << i;
       p_content = make_persistent<Content>(pop, std::to_string(val), val);
