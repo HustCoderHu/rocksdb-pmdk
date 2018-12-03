@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 
-#include <libpmemobj++/make_persistent.hpp>
-#include <libpmemobj++/make_persistent_array.hpp>
-#include <libpmemobj++/p.hpp>
-#include <libpmemobj++/persistent_ptr.hpp>
-#include <libpmemobj++/pool.hpp>
-#include <libpmemobj++/transaction.hpp>
+#include "libpmemobj++/p.hpp"
+#include "libpmemobj++/persistent_ptr.hpp"
+#include "libpmemobj++/pool.hpp"
+#include "libpmemobj++/transaction.hpp"
+#include "libpmemobj++/make_persistent.hpp"
+#include "libpmemobj++/make_persistent_array.hpp"
 
 namespace p_range {
 //using pmem;
@@ -23,17 +23,34 @@ using pmem::obj::persistent_ptr;
 using pmem::obj::make_persistent;
 using pmem::obj::transaction;
 
+#ifdef MY_DEBUG
+  #define MY_PRINT(fmt, args...)
+    printf("%s [%s:%d] " fmt, __FILE__, __func__, __LINE__, ##args)
+#else
+  #define MY_PRINT(fmt, args...)
+#endif
+
 template <typename T>
 class pmem_hash_map {
+  struct Node2;
   using p_node_t = persistent_ptr<Node2>;
 
   struct Node2 {
-    p_node_t next;
-    //  persistent_ptr<Node2<T>> next;
+    persistent_ptr<Node2> next;
     persistent_ptr<T> p_content;
   };
-
-  pmem_hash_map(pool_base &pop, double loadFactor, uint64_t tabLen)
+public:
+  pmem_hash_map(pool_base &pop, float loadFactor, uint64_t tabLen)
+  {
+    transaction::run(pop, [&]{
+      tabLen_ = tabLen;
+      tab_ = make_persistent<p_node_t[]>(tabLen);
+      loadFactor_ = loadFactor;
+      threshold_ = tabLen_ * loadFactor_;
+      size_ = 0;
+    });
+  }
+  void init(pool_base &pop, float loadFactor, uint64_t tabLen)
   {
     transaction::run(pop, [&]{
       tabLen_ = tabLen;
@@ -47,7 +64,7 @@ class pmem_hash_map {
   void getAll(vector<persistent_ptr<T> > &contentVec)
   {
     size_t tablen = tabLen_;
-    for (int i = 0; i < tablen; ++i) {
+    for (size_t i = 0; i < tablen; ++i) {
       p_node_t node = tab_[i];
 
       while (node != nullptr) {
@@ -57,18 +74,33 @@ class pmem_hash_map {
     }
   }
 
-  bool put(pool_base& pop, persistent_ptr<T> &p_content)
+  void put(pool_base& pop, persistent_ptr<T> &p_content)
   {
     // 调用者自己构建 map ，检查是否已经有同样的 key
+    MY_PRINT("\n");
     uint64_t _hash = p_content->hashCode();
-    p_node_t bucketHeadNode = tab_[_hash % tabLen_];
+    MY_PRINT("\n");
+    uint64_t tabLen = tabLen_.get_ro();
+    MY_PRINT("\n");
+    _hash = _hash % tabLen;
+    MY_PRINT("\n");
+    ptrdiff_t idx = static_cast<ptrdiff_t>(_hash);
+    MY_PRINT("\n");
+//    p_node_t bucketHeadNode = tab_[idx];
+    p_node_t bucketHeadNode = tab_[_hash % tabLen_.get_ro()];
+    MY_PRINT("\n");
 
     p_node_t newhead;
     transaction::run(pop, [&] {
-      newhead = make_persistent<p_node_t>();
+      MY_PRINT("\n");
+      newhead = make_persistent<Node2>();
+      MY_PRINT("\n");
       newhead->p_content = p_content;
+      MY_PRINT("\n");
       newhead->next = bucketHeadNode;
+      MY_PRINT("\n");
       tab_[_hash % tabLen_] = newhead;
+      MY_PRINT("\n");
     });
   }
   //  persistent_ptr<char[]> get(const std::string& key, size_t prefixLen);
@@ -77,9 +109,9 @@ class pmem_hash_map {
   //  using std::string;
   //  uint64_t put(pool_base& pop, const string& prefix, size_t bufSize);
   //  p_node putAndGet(pool_base& pop, const string& prefix, size_t bufSize);
-public:
+//public:
   p<uint32_t> tabLen_;
-  persistent_ptr<p_node[]> tab;
+//  persistent_ptr<p_node[]> tab;
   persistent_ptr<p_node_t[]> tab_;
 
   p<float> loadFactor_;

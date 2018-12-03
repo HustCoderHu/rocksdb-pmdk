@@ -1,7 +1,12 @@
 #include "pmem_hash_map.h"
 #include <string>
 #include <vector>
+#include <iostream>
 
+#include <unistd.h> // F_OK
+
+using std::cout;
+using std::endl;
 using std::string;
 using std::to_string;
 using std::vector;
@@ -14,14 +19,17 @@ using pmem::obj::make_persistent;
 using pmem::obj::transaction;
 using p_buf = persistent_ptr<char[]>;
 
-using namespace p_range;
+#define CREATE_MODE_RW (S_IWRITE | S_IREAD)
 
 static inline int
 file_exists(char const *file) {
   return access(file, F_OK);
 }
 
+using p_range::pmem_hash_map;
+
 class Content {
+public:
   Content(pool_base &pop, const string &prefix, size_t range_size)
   {
     transaction::run(pop, [&] {
@@ -40,6 +48,14 @@ class Content {
       v += c;
     return v;
   }
+  uint64_t hashCode()
+  {
+    uint64_t v = 0;
+    for (size_t i = 0; i < bufSize_; ++i) {
+      v += prefix_[i];
+    }
+    return v;
+  }
 
   p_buf prefix_;
   p<size_t> prefixLen_;
@@ -49,16 +65,22 @@ class Content {
 
 int main(int argc, char* argv[])
 {
-  string path = "";
+  string path = "/mnt/pmem/test_pmem_hash_map.pmem";
   pool<pmem_hash_map<Content> > pop;
+  persistent_ptr<pmem_hash_map<Content> > p_map;
 
-  if (file_exists(path.c_str())) {
-    pop = pool<pmem_hash_map<Content> >::open(path.c_str(), "layout";
-  } else
+  if (file_exists(path.c_str()) != 0) {
+    cout << "create pool" << endl;
     pop = pool<pmem_hash_map<Content> >::create(path.c_str(), "layout",PMEMOBJ_MIN_POOL,
                                                 CREATE_MODE_RW);
+    p_map = pop.root();
+    p_map->init(pop, 0.75f, 32);
+  } else {
+    cout << "open pool" << endl;
+    pop = pool<pmem_hash_map<Content> >::open(path.c_str(), "layout");
+  }
   //
-  persistent_ptr<pmem_hash_map<Content> > p_map = pop.root();
+  p_map = pop.root();
 
   persistent_ptr<Content> p_content = nullptr;
 
@@ -66,7 +88,14 @@ int main(int argc, char* argv[])
   if (argc > 1) {
     for (int i = 0; i < 13; ++i) {
       int val = 2 << i;
-      p_content = make_persistent<Content>(pop, std::to_string(val), val);
+      transaction::run(pop, [&] {
+        MY_PRINT("\n");
+        string str = std::to_string(val);
+        cout << "val = " << str.c_str() << endl;
+        p_content = make_persistent<Content>(pop, str, val);
+        MY_PRINT("\n");
+      });
+//      p_content = make_persistent<Content>(pop, std::to_string(val), val);
       p_map->put(pop, p_content);
     }
   }
@@ -79,11 +108,16 @@ int main(int argc, char* argv[])
 
     size_t i = 0;
     for (persistent_ptr<Content> cont : contentVec) {
-      string str(cont->prefix_.get(), cont->prefixLen_);
+      string str;
+      MY_PRINT("prefixLen_ = %s\n", cont->prefixLen_);
+      cout << "prefixLen_ = " << cont->prefixLen_ << endl;
+      str.assign(cont->prefix_.get(), cont->prefixLen_);
       size_t bufSize_ = cont->bufSize_;
       printf("%zu\n", i++);
       printf("prefix_ = %s\n", str);
       printf("bufSize_ = %zu\n", bufSize_);
     }
   }
+  pop.close();
+  return 0;
 }

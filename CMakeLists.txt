@@ -1,70 +1,28 @@
 cmake_minimum_required(VERSION 3.3)
-project(test_pmem_hash_map C CXX)
-
-set(LIBPMEMOBJ_REQUIRED_VERSION 1.4)
+project(test_pmem_hash_map CXX)
 
 set(CXX_STANDARD_REQUIRED ON)
-
 set(CXX_STANDARD 11 CACHE STRING "C++ language standard")
 set(CMAKE_CXX_STANDARD ${CXX_STANDARD})
 
-include(FindPerl)
 include(FindThreads)
-include(CMakeDependentOption)
-include(CMakePackageConfigHelpers)
-include(CheckCXXSourceCompiles)
 include(CheckCXXCompilerFlag)
-include(GNUInstallDirs)
+include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 
-if(NOT WIN32)
-  find_package(PkgConfig QUIET)
-endif()
+find_package(PkgConfig QUIET)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
-
-if(NOT PERL_FOUND)
-  message(FATAL_ERROR "Perl not found")
-endif()
-if (PERL_VERSION_STRING VERSION_LESS 5.16)
-  message(FATAL_ERROR "Too old Perl (<5.16)")
-endif()
-
+message(STATUS "ENV{PKG_CONFIG_PATH}: " $ENV{PKG_CONFIG_PATH})
+set(ENV{PKG_CONFIG_PATH} $ENV{PKG_CONFIG_PATH} /lib64/pkgconfig) # 
+set(ENV{PKG_CONFIG_PATH} $ENV{PKG_CONFIG_PATH}:/usr/local/lib64/pkgconfig)
+message(STATUS "after set: " $ENV{PKG_CONFIG_PATH})
 if(PKG_CONFIG_FOUND)
-  pkg_check_modules(LIBPMEMOBJ REQUIRED libpmemobj>=1.4)
+  pkg_check_modules(LIBPMEMOBJ++ REQUIRED libpmemobj++)
 else()
-  find_package(LIBPMEMOBJ REQUIRED 1.4)
+  find_package(LIBPMEMOBJ++ REQUIRED)
 endif()
 
-if(PKG_CONFIG_FOUND)
-  pkg_check_modules(VALGRIND QUIET valgrind)
-else()
-  find_package(VALGRIND QUIET)
-endif()
-
-if(PKG_CONFIG_FOUND)
-  pkg_check_modules(LIBUNWIND QUIET libunwind)
-else()
-  find_package(LIBUNWIND QUIET)
-endif()
-if(NOT LIBUNWIND_FOUND)
-  message(WARNING "libunwind not found. Stack traces from tests will not be reliable")
-endif()
-
-# Check for existence of pmemvlt (introduced after 1.4 release)
-set(SAVED_CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES})
-set(CMAKE_REQUIRED_INCLUDES ${LIBPMEMOBJ_INCLUDE_DIRS})
-CHECK_CXX_SOURCE_COMPILES(
-  "#include <libpmemobj.h>
-  struct pmemvlt vlt;
-  int main() {}"
-  PMEMVLT_PRESENT)
-set(CMAKE_REQUIRED_INCLUDES ${SAVED_CMAKE_REQUIRED_INCLUDES})
-
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  FILES_MATCHING PATTERN "*.hpp")
-
-configure_file(${CMAKE_SOURCE_DIR}/cmake/libpmemobj++.pc.in
-    ${CMAKE_CURRENT_BINARY_DIR}/libpmemobj++.pc @ONLY)
+link_directories(${LIBPMEMOBJ++_LIBRARY_DIRS})
+#link_directories(${LIBPMEM_LIBRARY_DIRS})
 
 # my test
 add_flag(-Wpointer-arith)
@@ -76,3 +34,23 @@ add_flag(-fno-common)
 add_flag(-ggdb DEBUG)
 add_flag(-DDEBUG DEBUG)
 add_flag("-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2" RELEASE)
+
+
+option(BUILD_TESTS "build tests" ON)
+
+set(TEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/test
+  CACHE STRING "working directory for tests")
+
+if(BUILD_TESTS)
+  if(TEST_DIR)
+    enable_testing()
+  else()
+    message(WARNING "TEST_DIR is empty - 'make test' will not work")
+  endif()
+  add_subdirectory(tests)
+endif()
+
+# set(CMAKE_BUILD_TYPE "Debug")
+# set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -o0 -Wall -g2 -ggdb")
+# set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -o2 -Wall")
+
