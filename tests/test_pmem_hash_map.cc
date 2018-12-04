@@ -111,11 +111,19 @@ int main(int argc, char* argv[])
       string str;
       MY_PRINT("prefixLen_ = %s\n", cont->prefixLen_);
       cout << "prefixLen_ = " << cont->prefixLen_ << endl;
-      str.assign(cont->prefix_.get(), cont->prefixLen_);
+
+//      str.assign(cont->prefix_.get(), cont->prefixLen_);
       size_t bufSize_ = cont->bufSize_;
       printf("%zu\n", i++);
-      printf("prefix_ = %s\n", str);
+      continue;
+//      printf("prefix_ = %s\n", str);
+      printf("prefix_ = ");
+      for (size_t j = 0; j < cont->prefixLen_; ++j) {
+        putchar(cont->prefix_[j]);
+      }
+      putchar('\n');
       printf("bufSize_ = %zu\n", bufSize_);
+      putchar('\n');
     }
   }
   pop.close();
