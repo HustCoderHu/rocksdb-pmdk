@@ -108,23 +108,20 @@ int main(int argc, char* argv[])
 
     size_t i = 0;
     for (persistent_ptr<Content> cont : contentVec) {
-      string str;
-      MY_PRINT("prefixLen_ = %s\n", cont->prefixLen_);
-      cout << "prefixLen_ = " << cont->prefixLen_ << endl;
-
-//      str.assign(cont->prefix_.get(), cont->prefixLen_);
-      size_t bufSize_ = cont->bufSize_;
       printf("%zu\n", i++);
-      continue;
-//      printf("prefix_ = %s\n", str);
-      printf("prefix_ = ");
+      cout << "prefixLen_ = " << cont->prefixLen_ << endl;
+      cout << "bufSize_ = " << cont->bufSize_ << endl;
+      cout << "char prefix_ = ";
       for (size_t j = 0; j < cont->prefixLen_; ++j) {
         putchar(cont->prefix_[j]);
       }
       putchar('\n');
-      printf("bufSize_ = %zu\n", bufSize_);
+
+      string str;
+      str.assign(cont->prefix_.get(), cont->prefixLen_);
+      cout << "str prefix_ = " << str << endl;
       putchar('\n');
-    }
+      size_t bufSize_ = cont->bufSize_;
   }
   pop.close();
   return 0;

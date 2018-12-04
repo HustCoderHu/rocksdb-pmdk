@@ -12,7 +12,7 @@ SOURCES += main.cpp \
     persistent_chunk.cc \
     persistent_hash_map.cpp \
     nv_range_tab.cpp \
-    test_pmem_hash_map.cc
+    tests/test_pmem_hash_map.cc
 
 HEADERS += \
     pmdk-include/libpmemobj/action.h \
@@ -104,3 +104,7 @@ INCLUDEPATH += pmdk-include
 INCLUDEPATH += E:\github_repo\rocksdb
 INCLUDEPATH += E:\github_repo\rocksdb\include
 INCLUDEPATH += E:\github_repo\rocksdb\utilities\nvm_write_cache
+
+DISTFILES += \
+    CMakeLists.txt \
+    tests/CMakeLists.txt

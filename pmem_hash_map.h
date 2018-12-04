@@ -23,7 +23,7 @@ using pmem::obj::persistent_ptr;
 using pmem::obj::make_persistent;
 using pmem::obj::transaction;
 
-#ifdef MY_DEBUG
+#ifdef DEBUG_PMEM_HASH_MAP
   #define MY_PRINT(fmt, args...)
     printf("%s [%s:%d] " fmt, __FILE__, __func__, __LINE__, ##args)
 #else
@@ -32,13 +32,11 @@ using pmem::obj::transaction;
 
 template <typename T>
 class pmem_hash_map {
-  struct Node2;
-  using p_node_t = persistent_ptr<Node2>;
-
   struct Node2 {
     persistent_ptr<Node2> next;
     persistent_ptr<T> p_content;
   };
+  using p_node_t = persistent_ptr<Node2>;
 public:
   pmem_hash_map(pool_base &pop, float loadFactor, uint64_t tabLen)
   {
