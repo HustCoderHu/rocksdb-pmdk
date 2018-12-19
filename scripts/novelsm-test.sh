@@ -15,7 +15,7 @@ NUMKEYS="160000000"
 #write_buffer_size_2 specifies NVM memtable size; set it in few GBs for perfomance;
 OTHERPARAMS="--num_levels=7 --write_buffer_size=$DRAMBUFFSZ --nvm_buffer_size=$NVMBUFFSZ"
 NUMREADTHREADS="0"
-VALUSESZ=512
+# VALUSESZ=512
 
 SETUP() {
   if [ -z "$TEST_TMPDIR" ]
@@ -27,22 +27,20 @@ SETUP() {
   mkdir -p $TEST_TMPDIR
 }
 
-MAKE() {
-  cd $NOVELSMSRC
-  #make clean
-  make -j8
-}
+# MAKE() {
+  # cd $NOVELSMSRC
+  # make clean
+  # make -j8
+# }
 
-
+# SETUP
 cd $NOVELSMSRC
-SETUP
-$APP_PREFIX $DBBENCH/db_bench --threads=$NUMTHREAD --num=$NUMKEYS \
---benchmarks=$BENCHMARKS --value_size=$VALUSESZ $OTHERPARAMS --num_read_threads=$NUMREADTHREADS
-SETUP
-
-for VALUSESZ in xx; do
+for VALUSESZ in ${VALUSESZ_ARRAY[@]}; do
+  echo 'next'
   echo ${VALUSESZ}
-  NUMKEYS='expr $a + $b'
+  let NUMKEYS=81920000000/${VALUSESZ}
+  echo $NUMKEYS
+  echo ''
   # rm -rf $TEST_TMPDIR/*
   # mkdir -p $TEST_TMPDIR
   
@@ -50,6 +48,7 @@ for VALUSESZ in xx; do
     # --benchmarks=$BENCHMARKS --value_size=$VALUSESZ $OTHERPARAMS --num_read_threads=$NUMREADTHREADS \
     # > value_size-${VALUSESZ}.log 2>&1
   sleep 1s
+  # SETUP
 done
 
 #Run all benchmarks
