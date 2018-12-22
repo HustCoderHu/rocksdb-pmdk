@@ -1,5 +1,8 @@
+#define NVM_DEBUG
+
 #include "nvm_arena.h"
 
+#include <string>
 #include "util/sync_point.h"
 #include "libpmem.h"
 #include "debug.h"
@@ -8,42 +11,35 @@ namespace rocksdb {
 
 // MSVC complains that it is already defined since it is static in the header.
 #ifndef _MSC_VER
-const size_t Arena::kInlineSize;
+//const size_t NVMArena::kInlineSize;
 #endif
 
-const size_t Arena::kMinBlockSize = 4096;
-const size_t Arena::kMaxBlockSize = 2u << 30;
+const size_t NVMArena::kMinBlockSize = 4096;
+const size_t NVMArena::kMaxBlockSize = 2u << 30;
 static const int kAlignUnit = alignof(max_align_t);
+int NVMArena::map_file_idx = 0;
 
-size_t OptimizeBlockSize(size_t block_size) {
-    // Make sure block_size is in optimal range
-    block_size = std::max(Arena::kMinBlockSize, block_size);
-    block_size = std::min(Arena::kMaxBlockSize, block_size);
-
-    // make sure block_size is the multiple of kAlignUnit
-    if (block_size % kAlignUnit != 0) {
-        block_size = (1 + block_size / kAlignUnit) * kAlignUnit;
-    }
-
-    return block_size;
-}
-
-NVMArena::NVMArena(std::string &filename, size_t block_size,
+NVMArena::NVMArena(size_t block_size,
                    AllocTracker *tracker, size_t huge_page_size)
-    : file_name_(filename)
-    , kBlockSize(OptimizeBlockSize(block_size))
-    , block_sz(block_size)
+    : block_sz(OptimizeBlockSize(block_size<<3))
+    , kBlockSize(OptimizeBlockSize(block_size<<3))
+//    , file_name_(filename)
 //    , tracker_(tracker)
 {
 //    assert(kBlockSize >= kMinBlockSize && kBlockSize <= kMaxBlockSize &&
 //           kBlockSize % kAlignUnit == 0);
 //    TEST_SYNC_POINT_CALLBACK("Arena::Arena:0", const_cast<size_t*>(&kBlockSize));
+    std::string str("/mnt/pmem/");
+    str += std::to_string(map_file_idx++) + ".nvm_arena";
 
-    block_addr = static_cast<char*>(pmem_map_file(path.c_str(),
-                                                          block_sz, PMEM_FILE_CREATE|PMEM_FILE_EXCL,
-                                                          0666, &mapped_len_, &is_pmem_));
-    if(aligned_alloc_ptr_ == NULL){
-        printf("map error\n");
+    DBG_PRINT("inparam block_size: %zu", block_size);
+    DBG_PRINT("block_sz: %zu", block_sz);
+
+    block_addr = static_cast<char*>(pmem_map_file(str.c_str(),
+                                                  block_sz, PMEM_FILE_CREATE|PMEM_FILE_EXCL,
+                                                  0666, &mapped_len_, &is_pmem_));
+    if(block_addr == NULL){
+        DBG_PRINT("map error");
         exit(-1);
     }
 //    capacity_ = size;
@@ -91,6 +87,9 @@ char *NVMArena::AllocateAligned(size_t bytes, size_t huge_page_size, Logger *log
     size_t slop = (current_mod == 0 ? 0 : kAlignUnit - current_mod);
     size_t needed = bytes + slop;
     char* result;
+//    DBG_PRINT("bytes: %zu", bytes);
+//    DBG_PRINT("needed: %zu", needed);
+//    DBG_PRINT("alloc_bytes_remaining_: %zu", alloc_bytes_remaining_);
     if (needed <= alloc_bytes_remaining_) {
         result = aligned_alloc_ptr_ + slop;
         aligned_alloc_ptr_ += needed;
@@ -107,6 +106,8 @@ char *NVMArena::AllocateFallback(size_t bytes, bool aligned)
 {
     // error
     DBG_PRINT("error - pmdk no new !!!");
+//    return nullptr;
+    exit(-1);
 
     if (bytes > kBlockSize / 4) {
         ++irregular_block_num;

@@ -24,26 +24,34 @@ public:
     // No copying allowed
     NVMArena(const NVMArena&) = delete;
     void operator=(const NVMArena&) = delete;
-    explicit NVMArena(std::string &filename, size_t block_size = Arena::kMinBlockSize,
+    explicit NVMArena(size_t block_size = Arena::kMinBlockSize,
                       AllocTracker* tracker = nullptr, size_t huge_page_size = 0);
     ~NVMArena();
 
     char* Allocate(size_t bytes) override;
     char* AllocateAligned(size_t bytes, size_t huge_page_size = 0,
                           Logger* logger = nullptr) override;
+    size_t BlockSize() const override { return block_sz; }
 
+
+    // Returns an estimate of the total memory usage of data allocated
+    // by the arena (exclude the space allocated but not yet used for future
+    // allocations).
+    size_t ApproximateMemoryUsage() const {
+        return blocks_memory_ - alloc_bytes_remaining_;
+    }
+    size_t MemoryAllocatedBytes() const { return blocks_memory_; }
+    size_t AllocatedAndUnused() const { return alloc_bytes_remaining_; }
 
     char* AllocateFallback(size_t bytes, bool aligned);
     char* AllocateNewBlock(size_t block_bytes);
 
-    // check and adjust the block_size so that the return value is
-    //  1. in the range of [kMinBlockSize, kMaxBlockSize].
-    //  2. the multiple of align unit.
-    extern size_t OptimizeBlockSize(size_t block_size);
 
-    static const size_t kInlineSize = 2048;
+//    static const size_t kInlineSize = 2048;
     static const size_t kMinBlockSize;
     static const size_t kMaxBlockSize;
+
+    static int map_file_idx;
 
     std::string file_name_;
     std::vector<std::string> file_vec;
@@ -68,7 +76,7 @@ public:
     std::vector<char*> blocks_;
 
     size_t blocks_memory_ = 0;
-//    AllocTracker* tracker_;
+    //    AllocTracker* tracker_;
 
     size_t mapped_len_;
     int is_pmem_;
