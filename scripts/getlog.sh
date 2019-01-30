@@ -16,12 +16,13 @@ gateway_dir=/home/pingcap/forward_log
 
 exec_machine=clx03
 exec_machine_usr=root
-# exec_machine_fpath=/home/hustzyw/xiaohu/ycsb-leveldbjni-binding-0.16.0
+exec_machine_fpath=/home/hustzyw/xiaohu/ycsb-leveldbjni-binding-0.16.0/novelsm_log/count5m
 # exec_machine_fpath=/home/hustzyw/log
-exec_machine_fpath=/home/hustzyw/xiaohu/ycsb-rocksdb-binding-0.15.0/log
+# exec_machine_fpath=/home/hustzyw/xiaohu/ycsb-rocksdb-binding-0.15.0/log
 
-target_file=fb
-# target_file=novelsm_log
+# target_file=our-nvm-workloads
+# target_file=fb
+target_file=load.log
 # target_file=rocksdb-4k1M-ssd.log
 # target_file=hs_err_pid162479.log
 
