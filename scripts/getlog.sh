@@ -16,17 +16,23 @@ gateway_dir=/home/pingcap/forward_log
 
 exec_machine=clx03
 exec_machine_usr=root
-exec_machine_fpath=/home/hustzyw/log_rocksdb_nvm
+exec_machine_fpath=/home/hustzyw/xiaohu/ycsb-leveldbjni-binding-0.16.0/novelsm_log/count5m
+# exec_machine_fpath=/home/hustzyw/log
+# exec_machine_fpath=/home/hustzyw/xiaohu/ycsb-rocksdb-binding-0.15.0/log
 
-target_file=1024-ssd.log
+# target_file=our-nvm-workloads
+# target_file=fb
+target_file=load.log
+# target_file=rocksdb-4k1M-ssd.log
+# target_file=hs_err_pid162479.log
 
 CDIR="cd "${gateway_dir}
 cmd_r=${CDIR}
-cmd_r=${cmd_r}"; scp "${exec_machine_usr}@${exec_machine}:${exec_machine_fpath}/${target_file}" ."
+cmd_r=${cmd_r}"; scp -r "${exec_machine_usr}@${exec_machine}:${exec_machine_fpath}/${target_file}" ."
 
 # echo $cmd_r
 # 右键粘贴跳板机密码
 ssh -t -p 10622 ${gateway_usr}@${gateway} "${cmd_r}"
 
 # 取到本地当前目录，右键粘贴跳板机密码
-scp -P 10622 ${gateway_usr}@${gateway}:${gateway_dir}/${target_file} .
+scp -P 10622 -r ${gateway_usr}@${gateway}:${gateway_dir}/${target_file} .
