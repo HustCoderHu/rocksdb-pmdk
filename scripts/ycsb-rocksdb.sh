@@ -2,18 +2,12 @@
 #set -x
 
 BIN=bin/ycsb
-# DB=/pmem/ycsb-rocksdb-xiaohu
-DB=/mnt/ssd/ycsb-rocksdb-xiaohu
-
-# workloadc workloadd workloadb workloada workloadf tsworkloada workloade
-# WORKLOAD_ARRAY=(workloadc workloadd workloadb workloada workloadf tsworkloada workloade)
-# WORKLOAD_ARRAY=(workloada workloadb workloadc workloadd workloade workloadf tsworkloada)
-# LOG_DIR=log/fb/aep
 
 # aep
-WORKLOAD_ARRAY=(workloade)
-DB=/pmem/ycsb-rocksdb-xiaohu
-LOG_DIR=log/fb/aep
+WORKLOAD_ARRAY=(c d b a f e)
+# DB=/pmem/ycsb-rocksdb-xiaohu
+DB=/pmem/xiaohu/fb-rocksdb-rid-merge
+LOG_DIR=log/fb/rid_merge_aep
 
 if [ ! -d $LOG_DIR ]; then
   echo dir not exists: $LOG_DIR
@@ -27,7 +21,7 @@ for WORKLOAD in ${WORKLOAD_ARRAY[@]}; do
   echo 3 > /proc/sys/vm/drop_caches
   sync
   $BIN run rocksdb -s \
--P our-nvm-workloads/$WORKLOAD \
+-P our-nvm-workloads/workload$WORKLOAD \
 -p rocksdb.dir=$DB \
 2>&1 | tee $LOG_DIR/$WORKLOAD.log
   echo ''
@@ -35,9 +29,13 @@ for WORKLOAD in ${WORKLOAD_ARRAY[@]}; do
 done
 
 # ssd
-WORKLOAD_ARRAY=(workloadc workloadd workloadb workloada workloadf tsworkloada workloade)
-DB=/mnt/ssd/ycsb-rocksdb-xiaohu
-LOG_DIR=log/fb/ssd
+DB=/mnt/ssd/xiaohu/fb-rocksdb-rid-merge
+LOG_DIR=log/fb/rid_merge_ssd
+
+if [ ! -d $LOG_DIR ]; then
+  echo dir not exists: $LOG_DIR
+  mkdir -p $LOG_DIR
+fi
 
 for WORKLOAD in ${WORKLOAD_ARRAY[@]}; do
   echo 'next'
@@ -46,7 +44,7 @@ for WORKLOAD in ${WORKLOAD_ARRAY[@]}; do
   echo 3 > /proc/sys/vm/drop_caches
   sync
   $BIN run rocksdb -s \
--P our-nvm-workloads/$WORKLOAD \
+-P our-nvm-workloads/workload$WORKLOAD \
 -p rocksdb.dir=$DB \
 2>&1 | tee $LOG_DIR/$WORKLOAD.log
   echo ''
