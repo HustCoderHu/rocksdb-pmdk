@@ -23,6 +23,7 @@ for WORKLOAD in ${WORKLOAD_ARRAY[@]}; do
   $BIN run rocksdb -s \
 -P our-nvm-workloads/workload$WORKLOAD \
 -p rocksdb.dir=$DB \
+-p rocks.threads=1 \
 2>&1 | tee $LOG_DIR/$WORKLOAD.log
   echo ''
   # sleep 1s
